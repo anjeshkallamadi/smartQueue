@@ -1,5 +1,6 @@
 import { Text, View, Pressable } from "react-native";
 import { router } from "expo-router";
+import { supabase } from "../lib/supabase";
 import styles from "../../styles/welcomeStyles";
 
 export default function Index() {
