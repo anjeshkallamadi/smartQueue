@@ -10,11 +10,22 @@ type UserProfile = {
   role: string;
 };
 
+type Service = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  location: string;
+  status: string;
+};
+
 export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadData = async () => {
+      // Get logged-in user
       const {
         data: { user },
         error: userError,
@@ -25,21 +36,35 @@ export default function Home() {
         return;
       }
 
-      const { data, error } = await supabase
+      // Get user profile
+      const { data: profileData, error: profileError } = await supabase
         .from("users")
         .select("name, email, role")
         .eq("id", user.id)
         .single();
 
-      if (error) {
+      if (profileError) {
         Alert.alert("Error", "Could not load your profile");
         return;
       }
 
-      setProfile(data);
+      setProfile(profileData);
+
+      // Get active services
+      const { data: servicesData, error: servicesError } = await supabase
+        .from("services")
+        .select("id, name, description, category, location, status")
+        .eq("status", "active");
+
+      if (servicesError) {
+        Alert.alert("Error", "Could not load services");
+        return;
+      }
+
+      setServices(servicesData);
     };
 
-    loadProfile();
+    loadData();
   }, []);
 
   const handleLogout = async () => {
@@ -63,15 +88,23 @@ export default function Home() {
             Welcome, {profile.name} 👋
           </Text>
 
-          <Text>
-            Email: {profile.email}
-          </Text>
-
-          <Text>
-            Role: {profile.role}
-          </Text>
+          <Text>Email: {profile.email}</Text>
+          <Text>Role: {profile.role}</Text>
         </>
       )}
+
+      <Text style={{ marginTop: 20, fontSize: 20 }}>
+        Available Services
+      </Text>
+
+      {services.map((service) => (
+        <View key={service.id} style={{ marginTop: 15 }}>
+          <Text>{service.name}</Text>
+          <Text>{service.description}</Text>
+          <Text>{service.category}</Text>
+          <Text>{service.location}</Text>
+        </View>
+      ))}
 
       <Pressable
         style={styles.button}
