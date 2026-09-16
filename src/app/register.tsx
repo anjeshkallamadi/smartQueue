@@ -10,36 +10,54 @@ import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
 import styles from "../../styles/loginStyles";
 
-export default function Login() {
+export default function Register() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please enter email and password");
+  const handleRegister = async () => {
+    if (!name || !email || !password) {
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          name,
+        },
+      },
     });
 
     if (error) {
-      Alert.alert("Login failed", error.message);
+      Alert.alert("Registration failed", error.message);
       return;
     }
 
-    router.replace("/home");
+    Alert.alert(
+      "Registration successful",
+      "Your account has been created."
+    );
+
+    router.replace("/login");
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome Back</Text>
+      <Text style={styles.title}>Create Account</Text>
 
       <Text style={styles.subtitle}>
-        Login to continue using SmartQueue
+        Register to start using SmartQueue
       </Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Name"
+        value={name}
+        onChangeText={setName}
+      />
 
       <TextInput
         style={styles.input}
@@ -60,14 +78,14 @@ export default function Login() {
 
       <Pressable
         style={styles.button}
-        onPress={handleLogin}
+        onPress={handleRegister}
       >
-        <Text style={styles.buttonText}>Login</Text>
+        <Text style={styles.buttonText}>Register</Text>
       </Pressable>
 
-      <Pressable onPress={() => router.push("/register")}>
+      <Pressable onPress={() => router.replace("/login")}>
         <Text style={styles.registerText}>
-          Don't have an account? Register
+          Already have an account? Login
         </Text>
       </Pressable>
     </View>
