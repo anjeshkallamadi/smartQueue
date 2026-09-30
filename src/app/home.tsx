@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
-import { Text, View, Pressable, Alert } from "react-native";
+import {
+  ScrollView,
+  Text,
+  View,
+  Pressable,
+  TextInput,
+  Alert,
+} from "react-native";
 import { router } from "expo-router";
+
 import {
   callNextToken,
   skipToken,
@@ -9,8 +17,9 @@ import {
   getQueues,
   joinQueue,
 } from "../lib/queueService";
+
 import { supabase } from "../lib/supabase";
-import styles from "../../styles/loginStyles";
+import styles from "../../styles/homeStyles";
 
 const QUEUE_ID = "f24ea8de-5f1f-474e-b094-b1116e8351fb";
 
@@ -65,7 +74,6 @@ export default function Home() {
 
         setProfile(profileData);
 
-        // Load queue for normal users
         if (profileData.role === "user") {
           const queues = await getQueues();
 
@@ -221,12 +229,16 @@ export default function Home() {
 
   if (profile.role === "admin") {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.greeting}>
           Admin Dashboard
         </Text>
 
-        <Text style={styles.subtitle}>
+        <Text style={styles.title}>
           Welcome, {profile.name}
         </Text>
 
@@ -234,60 +246,65 @@ export default function Home() {
           Role: {profile.role}
         </Text>
 
-        <Text
-          style={{
-            fontSize: 20,
-            marginVertical: 20,
-          }}
-        >
-          OPD Registration
+        <Text style={styles.sectionTitle}>
+          Queue Management
         </Text>
 
-        <Pressable
-          style={styles.button}
-          onPress={handleCallNext}
-        >
-          <Text style={styles.buttonText}>
-            Call Next Token
+        <View style={styles.queueCard}>
+          <Text style={styles.serviceName}>
+            OPD Registration
           </Text>
-        </Pressable>
+
+          <Text style={styles.serviceDescription}>
+            Manage the current registration queue.
+          </Text>
+
+          <Pressable
+            style={styles.joinButton}
+            onPress={handleCallNext}
+          >
+            <Text style={styles.joinButtonText}>
+              Call Next Token
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.joinButton}
+            onPress={handleSkipToken}
+          >
+            <Text style={styles.joinButtonText}>
+              Skip Current Token
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.joinButton}
+            onPress={handlePauseQueue}
+          >
+            <Text style={styles.joinButtonText}>
+              Pause Queue
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.joinButton}
+            onPress={handleResumeQueue}
+          >
+            <Text style={styles.joinButtonText}>
+              Resume Queue
+            </Text>
+          </Pressable>
+        </View>
 
         <Pressable
-          style={styles.button}
-          onPress={handleSkipToken}
-        >
-          <Text style={styles.buttonText}>
-            Skip Current Token
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
-          onPress={handlePauseQueue}
-        >
-          <Text style={styles.buttonText}>
-            Pause Queue
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
-          onPress={handleResumeQueue}
-        >
-          <Text style={styles.buttonText}>
-            Resume Queue
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.button}
+          style={styles.joinButton}
           onPress={handleLogout}
         >
-          <Text style={styles.buttonText}>
+          <Text style={styles.joinButtonText}>
             Logout
           </Text>
         </Pressable>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -296,74 +313,111 @@ export default function Home() {
   // =========================
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>
-        SmartQueue
-      </Text>
-
-      <Text style={styles.subtitle}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.greeting}>
         Welcome, {profile.name} 👋
       </Text>
 
-      <Text>
-        Email: {profile.email}
+      <Text style={styles.title}>
+        Find a service and skip the waiting line.
       </Text>
 
-      <Text>
-        Role: {profile.role}
-      </Text>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search services..."
+      />
 
-      <Text
-        style={{
-          fontSize: 20,
-          marginTop: 25,
-        }}
-      >
-        Available Queue
+      <Text style={styles.sectionTitle}>
+        My Active Queue
       </Text>
 
       {queue ? (
-        <View style={{ marginTop: 15 }}>
-          <Text style={{ fontSize: 18 }}>
+        <View style={styles.activeQueueCard}>
+          <Text style={styles.activeQueueTitle}>
             {queue.services[0]?.name ?? "Unknown Service"}
           </Text>
 
-          <Text>
+          <Text style={styles.emptyText}>
             Location:{" "}
             {queue.services[0]?.location ?? "Unknown"}
           </Text>
 
-          <Text>
+          <Text style={styles.emptyText}>
             Current Token: {queue.current_token}
           </Text>
 
-          <Text>
+          <Text style={styles.emptyText}>
             Status: {queue.status}
           </Text>
 
           <Pressable
-            style={styles.button}
+            style={styles.joinButton}
             onPress={handleJoinQueue}
           >
-            <Text style={styles.buttonText}>
+            <Text style={styles.joinButtonText}>
               Join Queue
             </Text>
           </Pressable>
         </View>
       ) : (
-        <Text style={{ marginTop: 15 }}>
-          No queues available
+        <View style={styles.activeQueueCard}>
+          <Text style={styles.activeQueueTitle}>
+            No active queue
+          </Text>
+
+          <Text style={styles.emptyText}>
+            No queues are currently available.
+          </Text>
+        </View>
+      )}
+
+      <Text style={styles.sectionTitle}>
+        Available Services
+      </Text>
+
+      {queue ? (
+        <View style={styles.queueCard}>
+          <Text style={styles.serviceName}>
+            {queue.services[0]?.name ?? "Service"}
+          </Text>
+
+          <Text style={styles.serviceDescription}>
+            {queue.services[0]?.description ??
+              "Join this service queue remotely."}
+          </Text>
+
+          <Text style={styles.serviceDescription}>
+            Location:{" "}
+            {queue.services[0]?.location ?? "Unknown"}
+          </Text>
+
+          <Pressable
+            style={styles.joinButton}
+            onPress={handleJoinQueue}
+          >
+            <Text style={styles.joinButtonText}>
+              Join Queue
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Text style={styles.emptyText}>
+          No services available.
         </Text>
       )}
 
       <Pressable
-        style={styles.button}
+        style={styles.joinButton}
         onPress={handleLogout}
       >
-        <Text style={styles.buttonText}>
+        <Text style={styles.joinButtonText}>
           Logout
         </Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }

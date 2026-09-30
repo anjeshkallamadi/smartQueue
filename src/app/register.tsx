@@ -8,16 +8,22 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
-import styles from "../../styles/loginStyles";
+import styles from "../../styles/registerStyles";
 
 export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !confirmPassword) {
       Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match");
       return;
     }
 
@@ -49,12 +55,13 @@ export default function Register() {
       <Text style={styles.title}>Create Account</Text>
 
       <Text style={styles.subtitle}>
-        Register to start using SmartQueue
+        Create your SmartQueue account
       </Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Name"
+        placeholder="Full Name"
+        autoCapitalize="words"
         value={name}
         onChangeText={setName}
       />
@@ -76,15 +83,23 @@ export default function Register() {
         onChangeText={setPassword}
       />
 
+      <TextInput
+        style={styles.input}
+        placeholder="Confirm Password"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+      />
+
       <Pressable
         style={styles.button}
         onPress={handleRegister}
       >
-        <Text style={styles.buttonText}>Register</Text>
+        <Text style={styles.buttonText}>Create Account</Text>
       </Pressable>
 
       <Pressable onPress={() => router.replace("/login")}>
-        <Text style={styles.registerText}>
+        <Text style={styles.loginText}>
           Already have an account? Login
         </Text>
       </Pressable>
