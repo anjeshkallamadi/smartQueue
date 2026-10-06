@@ -3,8 +3,9 @@ import {
   Text,
   View,
   TextInput,
-  Pressable,
 } from "react-native";
+import ActiveQueueCard from "../components/ActiveQueueCard";
+import ServiceCard from "../components/ServiceCard";
 import styles from "../../styles/homeStyles";
 
 export default function Home() {
@@ -27,71 +28,26 @@ export default function Home() {
 
       <Text style={styles.sectionTitle}>My Active Queue</Text>
 
-      <View style={styles.activeQueueCard}>
-        <Text style={styles.activeQueueTitle}>
-          No active queue
-        </Text>
-
-        <Text style={styles.emptyText}>
-          You are not currently waiting in any queue.
-          Join a service below to get started.
-        </Text>
-      </View>
+      <ActiveQueueCard />
 
       <Text style={styles.sectionTitle}>
         Available Services
       </Text>
 
-      <View style={styles.queueCard}>
-        <Text style={styles.serviceName}>
-          Hospital
-        </Text>
+      <ServiceCard
+        name="Harsha's Hospital"
+        description="Join a hospital service queue remotely and track your position."
+      />
 
-        <Text style={styles.serviceDescription}>
-          Join a hospital service queue remotely and
-          track your position.
-        </Text>
+      <ServiceCard
+        name="Vamsi's Bank"
+        description="Check the current queue and join before reaching the branch."
+      />
 
-        <Pressable style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>
-            Join Queue
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.queueCard}>
-        <Text style={styles.serviceName}>
-          Bank
-        </Text>
-
-        <Text style={styles.serviceDescription}>
-          Check the current queue and join before
-          reaching the branch.
-        </Text>
-
-        <Pressable style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>
-            Join Queue
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.queueCard}>
-        <Text style={styles.serviceName}>
-          Government Office
-        </Text>
-
-        <Text style={styles.serviceDescription}>
-          Reduce waiting time by joining the queue
-          before you arrive.
-        </Text>
-
-        <Pressable style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>
-            Join Queue
-          </Text>
-        </Pressable>
-      </View>
+      <ServiceCard
+        name="Anjesh's Office"
+        description="Reduce waiting time by joining the queue before you arrive."
+      />
     </ScrollView>
   );
 }
