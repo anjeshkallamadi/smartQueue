@@ -3,8 +3,8 @@ import {
   Text,
   View,
   TextInput,
-  Pressable,
 } from "react-native";
+import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
 import styles from "../../styles/homeStyles";
 
@@ -28,33 +28,24 @@ export default function Home() {
 
       <Text style={styles.sectionTitle}>My Active Queue</Text>
 
-      <View style={styles.activeQueueCard}>
-        <Text style={styles.activeQueueTitle}>
-          No active queue
-        </Text>
-
-        <Text style={styles.emptyText}>
-          You are not currently waiting in any queue.
-          Join a service below to get started.
-        </Text>
-      </View>
+      <ActiveQueueCard />
 
       <Text style={styles.sectionTitle}>
         Available Services
       </Text>
 
       <ServiceCard
-        name="Hospital"
+        name="Harsha's Hospital"
         description="Join a hospital service queue remotely and track your position."
       />
 
       <ServiceCard
-        name="Bank"
+        name="Vamsi's Bank"
         description="Check the current queue and join before reaching the branch."
       />
 
       <ServiceCard
-        name="Government Office"
+        name="Anjesh's Office"
         description="Reduce waiting time by joining the queue before you arrive."
       />
     </ScrollView>
