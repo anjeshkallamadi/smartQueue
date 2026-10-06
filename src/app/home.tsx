@@ -5,6 +5,7 @@ import {
   TextInput,
   Pressable,
 } from "react-native";
+import ServiceCard from "../components/ServiceCard";
 import styles from "../../styles/homeStyles";
 
 export default function Home() {
@@ -42,56 +43,20 @@ export default function Home() {
         Available Services
       </Text>
 
-      <View style={styles.queueCard}>
-        <Text style={styles.serviceName}>
-          Hospital
-        </Text>
+      <ServiceCard
+        name="Hospital"
+        description="Join a hospital service queue remotely and track your position."
+      />
 
-        <Text style={styles.serviceDescription}>
-          Join a hospital service queue remotely and
-          track your position.
-        </Text>
+      <ServiceCard
+        name="Bank"
+        description="Check the current queue and join before reaching the branch."
+      />
 
-        <Pressable style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>
-            Join Queue
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.queueCard}>
-        <Text style={styles.serviceName}>
-          Bank
-        </Text>
-
-        <Text style={styles.serviceDescription}>
-          Check the current queue and join before
-          reaching the branch.
-        </Text>
-
-        <Pressable style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>
-            Join Queue
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.queueCard}>
-        <Text style={styles.serviceName}>
-          Government Office
-        </Text>
-
-        <Text style={styles.serviceDescription}>
-          Reduce waiting time by joining the queue
-          before you arrive.
-        </Text>
-
-        <Pressable style={styles.joinButton}>
-          <Text style={styles.joinButtonText}>
-            Join Queue
-          </Text>
-        </Pressable>
-      </View>
+      <ServiceCard
+        name="Government Office"
+        description="Reduce waiting time by joining the queue before you arrive."
+      />
     </ScrollView>
   );
 }
