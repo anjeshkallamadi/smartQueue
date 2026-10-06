@@ -8,7 +8,7 @@ export default function ActiveQueueCard() {
 
       <Text style={styles.text}>
         You are not currently waiting in any queue.
-        Join a service below to get started.
+        Join a service below to get started "frontend Anjesh".
       </Text>
     </View>
   );
