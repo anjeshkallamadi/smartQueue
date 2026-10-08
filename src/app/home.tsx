@@ -1,9 +1,12 @@
 import {
   ScrollView,
   Text,
-  View,
   TextInput,
+  Pressable,
+  View,
 } from "react-native";
+import { router } from "expo-router";
+
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
 import styles from "../../styles/homeStyles";
@@ -15,7 +18,23 @@ export default function Home() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
+      <View style={styles.header}>
+  <Text style={styles.logoText}>
+    SmartQueue
+  </Text>
+
+  <Pressable
+    style={styles.profileButton}
+    onPress={() => router.push("/profile")}
+  >
+    <Text style={styles.profileButtonText}>
+      AK
+    </Text>
+  </Pressable>
+</View>
+      <Text style={styles.greeting}>
+        Welcome to SmartQueue 👋
+      </Text>
 
       <Text style={styles.title}>
         Find a service and skip the waiting line.
@@ -26,7 +45,9 @@ export default function Home() {
         placeholder="Search services..."
       />
 
-      <Text style={styles.sectionTitle}>My Active Queue</Text>
+      <Text style={styles.sectionTitle}>
+        My Active Queue
+      </Text>
 
       <ActiveQueueCard />
 
@@ -37,16 +58,46 @@ export default function Home() {
       <ServiceCard
         name="Harsha's Hospital"
         description="Join a hospital service queue remotely and track your position."
+        onPress={() =>
+          router.push({
+            pathname: "/queue-details",
+            params: {
+              serviceName: "Harsha's Hospital",
+              description:
+                "Join a hospital service queue remotely and track your position.",
+            },
+          })
+        }
       />
 
       <ServiceCard
         name="Vamsi's Bank"
         description="Check the current queue and join before reaching the branch."
+        onPress={() =>
+          router.push({
+            pathname: "/queue-details",
+            params: {
+              serviceName: "Vamsi's Bank",
+              description:
+                "Check the current queue and join before reaching the branch.",
+            },
+          })
+        }
       />
 
       <ServiceCard
         name="Anjesh's Office"
         description="Reduce waiting time by joining the queue before you arrive."
+        onPress={() =>
+          router.push({
+            pathname: "/queue-details",
+            params: {
+              serviceName: "Anjesh's Office",
+              description:
+                "Reduce waiting time by joining the queue before you arrive.",
+            },
+          })
+        }
       />
     </ScrollView>
   );
