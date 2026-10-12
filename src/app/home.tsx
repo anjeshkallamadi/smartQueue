@@ -1,10 +1,5 @@
-import {
-  ScrollView,
-  Text,
-  TextInput,
-  Pressable,
-  View,
-} from "react-native";
+
+import { ScrollView, Text, TextInput } from "react-native";
 import { router } from "expo-router";
 
 import ActiveQueueCard from "../components/ActiveQueueCard";
@@ -18,23 +13,7 @@ export default function Home() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.header}>
-  <Text style={styles.logoText}>
-    SmartQueue
-  </Text>
-
-  <Pressable
-    style={styles.profileButton}
-    onPress={() => router.push("/profile")}
-  >
-    <Text style={styles.profileButtonText}>
-      AK
-    </Text>
-  </Pressable>
-</View>
-      <Text style={styles.greeting}>
-        Welcome to SmartQueue 👋
-      </Text>
+      <Text style={styles.greeting}>Welcome back</Text>
 
       <Text style={styles.title}>
         Find a service and skip the waiting line.
@@ -45,9 +24,7 @@ export default function Home() {
         placeholder="Search services..."
       />
 
-      <Text style={styles.sectionTitle}>
-        My Active Queue
-      </Text>
+      <Text style={styles.sectionTitle}>My Active Queue</Text>
 
       <ActiveQueueCard />
 
@@ -62,6 +39,7 @@ export default function Home() {
           router.push({
             pathname: "/queue-details",
             params: {
+              queueId: "hospital",
               serviceName: "Harsha's Hospital",
               description:
                 "Join a hospital service queue remotely and track your position.",
@@ -77,6 +55,7 @@ export default function Home() {
           router.push({
             pathname: "/queue-details",
             params: {
+              queueId: "bank",
               serviceName: "Vamsi's Bank",
               description:
                 "Check the current queue and join before reaching the branch.",
@@ -92,6 +71,7 @@ export default function Home() {
           router.push({
             pathname: "/queue-details",
             params: {
+              queueId: "government-office",
               serviceName: "Anjesh's Office",
               description:
                 "Reduce waiting time by joining the queue before you arrive.",
