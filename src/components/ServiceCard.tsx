@@ -4,13 +4,11 @@ import styles from "../../styles/serviceCardStyles";
 type ServiceCardProps = {
   name: string;
   description: string;
-  onPress: () => void;
 };
 
 export default function ServiceCard({
   name,
   description,
-  onPress,
 }: ServiceCardProps) {
   return (
     <View style={styles.card}>
@@ -20,10 +18,7 @@ export default function ServiceCard({
         {description}
       </Text>
 
-      <Pressable
-        style={styles.joinButton}
-        onPress={onPress}
-      >
+      <Pressable style={styles.joinButton}>
         <Text style={styles.joinButtonText}>
           Join Queue
         </Text>
