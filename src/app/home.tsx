@@ -1,9 +1,14 @@
+
 import {
+  Pressable,
   ScrollView,
   Text,
-  View,
   TextInput,
+  View,
 } from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
 import styles from "../../styles/homeStyles";
@@ -15,6 +20,19 @@ export default function Home() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.header}>
+        <Text style={styles.logoText}>SmartQueue</Text>
+
+        <Pressable
+          style={styles.profileButton}
+          accessibilityRole="button"
+          accessibilityLabel="Open your account"
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person" size={22} color="#FFFFFF" />
+        </Pressable>
+      </View>
+
       <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
 
       <Text style={styles.title}>
