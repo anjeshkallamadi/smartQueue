@@ -17,38 +17,42 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
-    }
+  if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+    Alert.alert("Error", "Please fill in all fields");
+    return;
+  }
 
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
-    }
+  if (password !== confirmPassword) {
+    Alert.alert("Error", "Passwords do not match");
+    return;
+  }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-        },
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: {
+      data: {
+        name: name.trim(),
       },
-    });
+    },
+  });
 
-    if (error) {
-      Alert.alert("Registration failed", error.message);
-      return;
-    }
+  if (error) {
+    Alert.alert("Registration failed", error.message);
+    return;
+  }
 
+  if (data.session) {
+    Alert.alert("Success", "Your account has been created.");
+    router.replace("/home");
+  } else {
     Alert.alert(
-      "Registration successful",
-      "Your account has been created."
+      "Check your email",
+      "confirmation is required, verify your email before logging in."
     );
-
     router.replace("/login");
-  };
+  }
+};
 
   return (
     <View style={styles.container}>

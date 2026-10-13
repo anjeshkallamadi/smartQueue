@@ -25,6 +25,34 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Supabase authentication setup
+
+SmartQueue uses Supabase Authentication for registration,
+login, and persistent user sessions.
+
+Create a `.env.local` file in the project root:
+
+    EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+    EXPO_PUBLIC_SUPABASE_KEY=your_supabase_publishable_key
+
+Use the project URL and publishable (or legacy anon) key
+from your Supabase project settings.
+
+Never use a service-role or secret key in the Expo app.
+
+The `.env.local` file is ignored by Git and must not be committed.
+
+After configuration, run:
+
+    npm install
+    npx expo start --clear
+
+The `src/lib/authService.ts` file exports
+`getCurrentUserId(): Promise<string | null>`.
+
+It returns the authenticated user's ID or `null`
+when no authenticated user exists.
+
 ## Get a fresh project
 
 When you're ready, run:
