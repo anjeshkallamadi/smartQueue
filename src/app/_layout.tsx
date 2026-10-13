@@ -37,6 +37,7 @@ export default function RootLayout() {
 
     const currentRoute = segments[0];
     const isAuthScreen =
+      currentRoute === "index" ||
       currentRoute === "login" ||
       currentRoute === "register" ||
       currentRoute === undefined;
