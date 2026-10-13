@@ -35,16 +35,16 @@ export default function RootLayout() {
   useEffect(() => {
     if (loading) return;
 
-    const currentRoute = segments[0];
-    const isAuthScreen =
-      currentRoute === "index" ||
-      currentRoute === "login" ||
-      currentRoute === "register" ||
-      currentRoute === undefined;
+        const currentRoute = segments[0];
 
-    if (!session && !isAuthScreen) {
+    const isPublicRoute =
+      currentRoute === undefined || // Welcome (index.tsx)
+      currentRoute === "login" ||
+      currentRoute === "register";
+
+    if (!session && !isPublicRoute) {
       router.replace("/login");
-    } else if (session && isAuthScreen) {
+    } else if (session && isPublicRoute) {
       router.replace("/home");
     }
   }, [session, loading, segments, router]);
