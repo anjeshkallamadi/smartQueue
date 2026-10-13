@@ -1,4 +1,5 @@
 export interface QueueEntry {
+  queueId: string;
   userId: string;
   token: string;
   joinedAt: Date;
@@ -8,95 +9,145 @@ export interface QueueHistoryEntry extends QueueEntry {
   leftAt: Date;
 }
 
-const queue: QueueEntry[] = [];
+// Store active entries separately for each service queue.
+const queues = new Map<string, QueueEntry[]>();
+
+// Keep token numbers separate for each queue.
+const nextTokenNumbers = new Map<string, number>();
+
 const queueHistory: QueueHistoryEntry[] = [];
 
-let nextTokenNumber = 1;
-
-// Average time required to serve one person (in minutes)
+// Average service time per person, in minutes.
 const AVERAGE_SERVICE_TIME = 5;
 
 /**
- * Generates a new token for the queue.
+ * Gets a queue or creates it if it doesn't exist.
  */
-export function generateToken(): string {
-  const token = `A${String(nextTokenNumber).padStart(3, "0")}`;
-  nextTokenNumber++;
+function getOrCreateQueue(queueId: string): QueueEntry[] {
+  let queue = queues.get(queueId);
 
-  return token;
+  if (!queue) {
+    queue = [];
+    queues.set(queueId, queue);
+  }
+
+  return queue;
 }
 
 /**
- * Adds a user to the queue and assigns a token.
+ * Generates a token within a specific queue.
  */
-export function joinQueue(userId: string): QueueEntry {
-  const token = generateToken();
+export function generateToken(queueId: string): string {
+  const nextNumber = nextTokenNumbers.get(queueId) ?? 1;
+
+  nextTokenNumbers.set(queueId, nextNumber + 1);
+
+  return `A${String(nextNumber).padStart(3, "0")}`;
+}
+
+/**
+ * Adds a user to a queue.
+ * Prevents duplicate active entries for the same user and queue.
+ */
+export function joinQueue(
+  queueId: string,
+  userId: string
+): QueueEntry {
+  if (!queueId.trim() || !userId.trim()) {
+    throw new Error("queueId and userId are required.");
+  }
+
+  const queue = getOrCreateQueue(queueId);
+
+  const existingEntry = queue.find(
+    (entry) => entry.userId === userId
+  );
+
+  if (existingEntry) {
+    return { ...existingEntry };
+  }
 
   const entry: QueueEntry = {
+    queueId,
     userId,
-    token,
+    token: generateToken(queueId),
     joinedAt: new Date(),
   };
 
   queue.push(entry);
 
-  return entry;
+  return { ...entry };
 }
 
 /**
- * Returns the current queue.
+ * Returns the active entries for a specific queue.
  */
-export function getQueue(): QueueEntry[] {
-  return [...queue];
+export function getQueue(queueId: string): QueueEntry[] {
+  return (queues.get(queueId) ?? []).map(
+    (entry) => ({ ...entry })
+  );
 }
 
 /**
  * Returns the number of people ahead of a user.
+ * Returns -1 if the user isn't in the queue.
  */
-export function getPeopleAhead(userId: string): number {
-  const userIndex = queue.findIndex(
+export function getPeopleAhead(
+  queueId: string,
+  userId: string
+): number {
+  const queue = queues.get(queueId) ?? [];
+
+  return queue.findIndex(
     (entry) => entry.userId === userId
   );
-
-  if (userIndex === -1) {
-    return 0;
-  }
-
-  return userIndex;
 }
 
 /**
- * Returns the estimated waiting time in minutes.
+ * Estimates waiting time in minutes.
  */
-export function getEstimatedWaitTime(userId: string): number {
-  const peopleAhead = getPeopleAhead(userId);
+export function getEstimatedWaitTime(
+  queueId: string,
+  userId: string
+): number {
+  const peopleAhead = getPeopleAhead(queueId, userId);
+
+  if (peopleAhead === -1) {
+    return 0;
+  }
 
   return peopleAhead * AVERAGE_SERVICE_TIME;
 }
 
 /**
- * Returns the current status of a user's queue.
+ * Returns the user's status in a specific queue.
  */
-export function getQueueStatus(userId: string): string {
-  const userIndex = queue.findIndex(
-    (entry) => entry.userId === userId
-  );
+export function getQueueStatus(
+  queueId: string,
+  userId: string
+): string {
+  const peopleAhead = getPeopleAhead(queueId, userId);
 
-  if (userIndex === -1) {
+  if (peopleAhead === -1) {
     return "Not in queue";
   }
 
-  if (userIndex === 0) {
-    return "Now serving";
-  }
-
-  return "Waiting";
+  return peopleAhead === 0 ? "Now serving" : "Waiting";
 }
 
 /**
- * Removes a user from the queue.
+ * Removes a user from a specific queue and records their history.
  */
-export function leaveQueue(userId: string): boolean {
+export function leaveQueue(
+  queueId: string,
+  userId: string
+): boolean {
+  const queue = queues.get(queueId);
+
+  if (!queue) {
+    return false;
+  }
+
   const userIndex = queue.findIndex(
     (entry) => entry.userId === userId
   );
@@ -116,10 +167,18 @@ export function leaveQueue(userId: string): boolean {
 }
 
 /**
- * Returns the user's queue history.
+ * Returns a user's queue history.
+ * Optionally filters history by queue ID.
  */
-export function getQueueHistory(userId: string): QueueHistoryEntry[] {
-  return queueHistory.filter(
-    (entry) => entry.userId === userId
-  );
+export function getQueueHistory(
+  userId: string,
+  queueId?: string
+): QueueHistoryEntry[] {
+  return queueHistory
+    .filter(
+      (entry) =>
+        entry.userId === userId &&
+        (queueId === undefined || entry.queueId === queueId)
+    )
+    .map((entry) => ({ ...entry }));
 }
