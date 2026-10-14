@@ -5,10 +5,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+
   content: {
     padding: 24,
     paddingBottom: 30,
   },
+
+  header: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 24,
+},
+
+logoText: {
+  fontSize: 22,
+  fontWeight: "700",
+  color: "#2563EB",
+},
+
+profileButton: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: "#2563EB",
+  alignItems: "center",
+  justifyContent: "center",
+},
 
   greeting: {
     fontSize: 16,

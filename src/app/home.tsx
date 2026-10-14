@@ -1,9 +1,13 @@
+
 import {
+  Pressable,
   ScrollView,
   Text,
   TextInput,
+  View,
 } from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
@@ -37,7 +41,20 @@ export default function Home() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.greeting}>Welcome back</Text>
+      <View style={styles.header}>
+        <Text style={styles.logoText}>SmartQueue</Text>
+
+        <Pressable
+          style={styles.profileButton}
+          accessibilityRole="button"
+          accessibilityLabel="Open your account"
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person" size={22} color="#FFFFFF" />
+        </Pressable>
+      </View>
+
+      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
 
       <Text style={styles.title}>
         Find a service and skip the waiting line.
@@ -49,15 +66,11 @@ export default function Home() {
         accessibilityLabel="Search services"
       />
 
-      <Text style={styles.sectionTitle}>
-        My Active Queue
-      </Text>
+      <Text style={styles.sectionTitle}>My Active Queue</Text>
 
       <ActiveQueueCard />
 
-      <Text style={styles.sectionTitle}>
-        Available Services
-      </Text>
+      <Text style={styles.sectionTitle}>Available Services</Text>
 
       {services.map((service) => (
         <ServiceCard
