@@ -1,5 +1,4 @@
 
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,11 +8,14 @@ import {
   Text,
   View,
 } from "react-native";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import styles from "../../styles/queueDetailsStyles";
+
 import {
   formatQueueToken,
   getMyActiveQueueEntry,
+  getMyQueuePosition,
   getSupabaseQueue,
   joinSupabaseQueue,
 } from "../services/supabaseQueueService";
@@ -35,24 +37,38 @@ export default function QueueDetails() {
     }>();
 
   const [entry, setEntry] = useState<MyEntry | null>(null);
+
   const [queueStatus, setQueueStatus] = useState("");
-  const [averageMinutes, setAverageMinutes] = useState<number | null>(null);
+  const [averageMinutes, setAverageMinutes] =
+    useState<number | null>(null);
+
+  const [peopleAhead, setPeopleAhead] =
+    useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
   const [message, setMessage] = useState<string | null>(null);
+  const [positionError, setPositionError] =
+    useState<string | null>(null);
 
   const joinInProgress = useRef(false);
 
+  // Load queue information and the user's saved entry.
   const loadDetails = useCallback(async () => {
     if (!queueId) {
       setMessage("No queue ID was provided.");
+      setEntry(null);
+      setPeopleAhead(null);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
     try {
       setMessage(null);
+      setPositionError(null);
 
       const [queue, myEntry] = await Promise.all([
         getSupabaseQueue(queueId),
@@ -62,6 +78,27 @@ export default function QueueDetails() {
       setQueueStatus(queue.status);
       setAverageMinutes(queue.average_service_time);
       setEntry(myEntry);
+      setPeopleAhead(null);
+
+      if (myEntry) {
+        try {
+          const position = await getMyQueuePosition(queueId);
+
+          setPeopleAhead(position.people_ahead);
+
+          setEntry({
+            ...myEntry,
+            status: position.entry_status,
+            token_number: position.token_number,
+          });
+        } catch (error) {
+          setPositionError(
+            error instanceof Error
+              ? error.message
+              : "Unable to refresh queue position."
+          );
+        }
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -74,6 +111,7 @@ export default function QueueDetails() {
     }
   }, [queueId]);
 
+  // Refresh whenever the screen becomes active.
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
@@ -81,17 +119,29 @@ export default function QueueDetails() {
     }, [loadDetails])
   );
 
+  // Pull down to refresh queue position.
   const handleRefresh = async () => {
+    if (refreshing || joining) return;
+
     setRefreshing(true);
     await loadDetails();
   };
 
+  // Join the queue through the secure Supabase RPC.
   const handleJoin = async () => {
-    if (!queueId || joinInProgress.current) return;
+    if (
+      !queueId ||
+      joinInProgress.current ||
+      joining ||
+      entry
+    ) {
+      return;
+    }
 
     joinInProgress.current = true;
     setJoining(true);
     setMessage(null);
+    setPositionError(null);
 
     try {
       const result = await joinSupabaseQueue(queueId);
@@ -104,9 +154,9 @@ export default function QueueDetails() {
         joined_at: new Date().toISOString(),
       });
 
-      setMessage(
-        `Joined successfully! People ahead when joined: ${result.people_ahead}`
-      );
+      setPeopleAhead(result.people_ahead);
+
+      setMessage("Successfully joined the queue!");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -119,8 +169,18 @@ export default function QueueDetails() {
     }
   };
 
+  const estimatedWait =
+    peopleAhead !== null &&
+    averageMinutes !== null &&
+    averageMinutes > 0
+      ? peopleAhead * averageMinutes
+      : null;
+
   const buttonDisabled =
-    loading || joining || Boolean(entry) || queueStatus !== "active";
+    loading ||
+    joining ||
+    Boolean(entry) ||
+    queueStatus !== "active";
 
   return (
     <ScrollView
@@ -133,48 +193,79 @@ export default function QueueDetails() {
         />
       }
     >
+      {/* Service information */}
       <Text style={styles.serviceName}>
         {serviceName ?? "Service"}
       </Text>
 
       <Text style={styles.description}>
-        {description ?? "View queue information and join remotely."}
+        {description ??
+          "View queue information and join remotely."}
       </Text>
 
-      <Text style={styles.sectionTitle}>Current Queue</Text>
+      {/* Current queue information */}
+      <Text style={styles.sectionTitle}>
+        Current Queue
+      </Text>
 
       <View style={styles.infoCard}>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Queue status</Text>
+          <Text style={styles.infoLabel}>
+            Queue Status
+          </Text>
+
           <Text style={styles.infoValue}>
             {queueStatus || "Loading..."}
           </Text>
         </View>
 
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Now serving</Text>
-          <Text style={styles.infoValue}>Not available yet</Text>
+          <Text style={styles.infoLabel}>
+            Now Serving
+          </Text>
+
+          <Text style={styles.infoValue}>
+            Not available yet
+          </Text>
         </View>
 
-        <View style={[styles.infoRow, styles.infoRowLast]}>
-          <Text style={styles.infoLabel}>Average service time</Text>
+        <View
+          style={[
+            styles.infoRow,
+            styles.infoRowLast,
+          ]}
+        >
+          <Text style={styles.infoLabel}>
+            Average Service Time
+          </Text>
+
           <Text style={styles.infoValue}>
-            {averageMinutes == null
+            {averageMinutes === null
               ? "Not available"
               : `${averageMinutes} min`}
           </Text>
         </View>
       </View>
 
-      {loading && <ActivityIndicator size="large" />}
+      {/* Loading indicator */}
+      {loading && (
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+        />
+      )}
 
+      {/* Join queue button */}
       <Pressable
         style={[
           styles.joinButton,
-          buttonDisabled && styles.joinButtonDisabled,
+          buttonDisabled &&
+            styles.joinButtonDisabled,
         ]}
         onPress={handleJoin}
         disabled={buttonDisabled}
+        accessibilityRole="button"
+        accessibilityLabel="Join selected queue"
       >
         <Text style={styles.joinButtonText}>
           {loading
@@ -189,38 +280,68 @@ export default function QueueDetails() {
         </Text>
       </Pressable>
 
+      {/* Success or error message */}
       {message && (
-        <Text style={styles.message}>{message}</Text>
+        <Text
+          style={styles.message}
+          accessibilityRole="alert"
+        >
+          {message}
+        </Text>
       )}
 
+      {/* User's active queue entry */}
       {entry && (
         <View style={styles.resultCard}>
-          <Text style={styles.tokenLabel}>Your Token</Text>
+          <Text style={styles.tokenLabel}>
+            Your Token
+          </Text>
 
           <Text style={styles.token}>
-            {formatQueueToken(entry.token_number)}
+            {formatQueueToken(
+              entry.token_number
+            )}
           </Text>
 
           <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Status</Text>
+            <Text style={styles.resultLabel}>
+              People Ahead
+            </Text>
+
+            <Text style={styles.resultValue}>
+              {peopleAhead === null
+                ? "Unavailable"
+                : peopleAhead}
+            </Text>
+          </View>
+
+          <View style={styles.resultRow}>
+            <Text style={styles.resultLabel}>
+              Estimated Wait
+            </Text>
+
+            <Text style={styles.resultValue}>
+              {estimatedWait === null
+                ? "Unavailable"
+                : `${estimatedWait} min (approx.)`}
+            </Text>
+          </View>
+
+          <View style={styles.resultRow}>
+            <Text style={styles.resultLabel}>
+              Status
+            </Text>
+
             <Text style={styles.resultValue}>
               {entry.status}
             </Text>
           </View>
 
-          <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>People Ahead</Text>
-            <Text style={styles.resultValue}>
-              Position refresh coming next
+          {positionError && (
+            <Text style={styles.message}>
+              {positionError}
             </Text>
-          </View>
-
-          <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Estimated Wait</Text>
-            <Text style={styles.resultValue}>
-              Not available yet
-            </Text>
-          </View>
+          )}
         </View>
       )}
     </ScrollView>

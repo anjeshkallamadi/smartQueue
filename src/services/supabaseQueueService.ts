@@ -140,3 +140,32 @@ export async function getAvailableServiceQueues():
   });
 }
 
+
+export interface MyQueuePosition {
+  token_number: number;
+  entry_status: string;
+  people_ahead: number;
+}
+
+export async function getMyQueuePosition(
+  queueId: string
+): Promise<MyQueuePosition> {
+  const { data, error } = await supabase.rpc(
+    "get_my_queue_position",
+    { p_queue_id: queueId }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const position = (data as MyQueuePosition[] | null)?.[0];
+
+  if (!position) {
+    throw new Error("Queue position not found.");
+  }
+
+  return position;
+}
+
+
