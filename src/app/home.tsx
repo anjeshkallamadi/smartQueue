@@ -16,6 +16,8 @@ import styles from "../../styles/homeStyles";
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
 
+import { checkIsAdmin } from "../services/adminQueueService";
+
 import {
   getAvailableServiceQueues,
   type AvailableServiceQueue,
@@ -27,11 +29,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadServices = useCallback(async () => {
     try {
       setError(null);
-
       const result = await getAvailableServiceQueues();
       setServices(result);
     } catch (err) {
@@ -51,6 +53,25 @@ export default function Home() {
       setLoading(true);
       void loadServices();
     }, [loadServices])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setIsAdmin(false);
+
+      checkIsAdmin()
+        .then((allowed) => {
+          if (active) setIsAdmin(allowed);
+        })
+        .catch(() => {
+          if (active) setIsAdmin(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [])
   );
 
   const handleRefresh = async () => {
@@ -95,6 +116,23 @@ export default function Home() {
         Find a service and skip the waiting line.
       </Text>
 
+      {isAdmin && (
+        <Pressable
+          style={styles.adminButton}
+          accessibilityRole="button"
+          onPress={() => router.push("/admin-dashboard")}
+        >
+          <Ionicons
+            name="settings-outline"
+            size={22}
+            color="#FFFFFF"
+          />
+          <Text style={styles.adminButtonText}>
+            Open Admin Dashboard
+          </Text>
+        </Pressable>
+      )}
+
       <TextInput
         style={styles.searchInput}
         placeholder="Search services..."
@@ -111,13 +149,11 @@ export default function Home() {
       {loading && <ActivityIndicator size="large" />}
 
       {error && (
-        <Text style={{ color: "#DC2626", marginBottom: 12 }}>
-          {error}
-        </Text>
+        <Text style={styles.errorText}>{error}</Text>
       )}
 
       {!loading && !error && filteredServices.length === 0 && (
-        <Text style={{ marginBottom: 16 }}>
+        <Text style={styles.emptyText}>
           No available services found.
         </Text>
       )}
@@ -143,14 +179,9 @@ export default function Home() {
 
       <Pressable
         onPress={() => router.push("/queue-test")}
-        style={{
-          padding: 16,
-          backgroundColor: "#2563EB",
-          borderRadius: 10,
-          marginTop: 16,
-        }}
+        style={styles.testButton}
       >
-        <Text style={{ color: "#FFFFFF", textAlign: "center" }}>
+        <Text style={styles.testButtonText}>
           Test Supabase Queue
         </Text>
       </Pressable>
