@@ -78,3 +78,65 @@ export async function getSupabaseQueue(queueId: string): Promise<QueueRecord> {
   if (error) throw new Error(error.message);
   return data as QueueRecord;
 }
+
+
+export interface AvailableServiceQueue {
+  queueId: string;
+  serviceId: string;
+  serviceName: string;
+  description: string;
+  status: string;
+}
+
+/**
+ * Loads real services and their queues from Supabase.
+ * Only active queues are shown as joinable services.
+ */
+export async function getAvailableServiceQueues():
+  Promise<AvailableServiceQueue[]> {
+
+  const { data: queues, error: queueError } = await supabase
+    .from("queues")
+    .select("id, service_id, status")
+    .eq("status", "active");
+
+  if (queueError) {
+    throw new Error(queueError.message);
+  }
+
+  if (!queues?.length) {
+    return [];
+  }
+
+  const serviceIds = [
+    ...new Set(queues.map((queue) => queue.service_id)),
+  ];
+
+  const { data: services, error: serviceError } = await supabase
+    .from("services")
+    .select("id, name, description")
+    .in("id", serviceIds);
+
+  if (serviceError) {
+    throw new Error(serviceError.message);
+  }
+
+  const serviceMap = new Map(
+    (services ?? []).map((service) => [service.id, service])
+  );
+
+  return queues.flatMap((queue) => {
+    const service = serviceMap.get(queue.service_id);
+
+    if (!service) return [];
+
+    return [{
+      queueId: queue.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      description: service.description ?? "",
+      status: queue.status,
+    }];
+  });
+}
+
