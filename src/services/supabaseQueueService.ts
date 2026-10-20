@@ -169,3 +169,20 @@ export async function getMyQueuePosition(
 }
 
 
+export async function getNowServingToken(
+  queueId: string
+): Promise<number | null> {
+  const { data, error } = await supabase.rpc(
+    "get_queue_now_serving",
+    { p_queue_id: queueId }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as number | null;
+}
+
+
+

@@ -1,4 +1,5 @@
 
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -8,7 +9,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import styles from "../../styles/queueDetailsStyles";
 
@@ -16,8 +16,9 @@ import {
   formatQueueToken,
   getMyActiveQueueEntry,
   getMyQueuePosition,
+  getNowServingToken,
   getSupabaseQueue,
-  joinSupabaseQueue,
+  joinSupabaseQueue
 } from "../services/supabaseQueueService";
 
 type MyEntry = {
@@ -45,6 +46,9 @@ export default function QueueDetails() {
   const [peopleAhead, setPeopleAhead] =
     useState<number | null>(null);
 
+  const [nowServing, setNowServing] =
+  useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,10 +74,14 @@ export default function QueueDetails() {
       setMessage(null);
       setPositionError(null);
 
-      const [queue, myEntry] = await Promise.all([
-        getSupabaseQueue(queueId),
-        getMyActiveQueueEntry(queueId),
+      const [queue, myEntry, currentServing] =
+        await Promise.all([
+          getSupabaseQueue(queueId),
+          getMyActiveQueueEntry(queueId),
+          getNowServingToken(queueId),
       ]);
+
+      setNowServing(currentServing);
 
       setQueueStatus(queue.status);
       setAverageMinutes(queue.average_service_time);
@@ -225,7 +233,9 @@ export default function QueueDetails() {
           </Text>
 
           <Text style={styles.infoValue}>
-            Not available yet
+            {nowServing === null
+            ? "None"
+            : formatQueueToken(nowServing)}
           </Text>
         </View>
 
