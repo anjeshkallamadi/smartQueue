@@ -1,4 +1,3 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -38,9 +37,7 @@ export default function Home() {
       setServices(result);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load services."
+        err instanceof Error ? err.message : "Unable to load services."
       );
     } finally {
       setLoading(false);
@@ -89,15 +86,11 @@ export default function Home() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
       <View style={styles.header}>
         <Text style={styles.logoText}>SmartQueue</Text>
-
         <Pressable
           style={styles.profileButton}
           accessibilityRole="button"
@@ -108,10 +101,7 @@ export default function Home() {
         </Pressable>
       </View>
 
-      <Text style={styles.greeting}>
-        Welcome to SmartQueue 👋
-      </Text>
-
+      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
       <Text style={styles.title}>
         Find a service and skip the waiting line.
       </Text>
@@ -122,11 +112,7 @@ export default function Home() {
           accessibilityRole="button"
           onPress={() => router.push("/admin-dashboard")}
         >
-          <Ionicons
-            name="settings-outline"
-            size={22}
-            color="#FFFFFF"
-          />
+          <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
           <Text style={styles.adminButtonText}>
             Open Admin Dashboard
           </Text>
@@ -141,21 +127,13 @@ export default function Home() {
       />
 
       <Text style={styles.sectionTitle}>My Active Queue</Text>
-
       <ActiveQueueCard />
-
       <Text style={styles.sectionTitle}>Available Services</Text>
 
       {loading && <ActivityIndicator size="large" />}
-
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
-      )}
-
+      {error && <Text style={styles.errorText}>{error}</Text>}
       {!loading && !error && filteredServices.length === 0 && (
-        <Text style={styles.emptyText}>
-          No available services found.
-        </Text>
+        <Text style={styles.emptyText}>No available services found.</Text>
       )}
 
       {!loading &&
@@ -176,15 +154,6 @@ export default function Home() {
             }
           />
         ))}
-
-      <Pressable
-        onPress={() => router.push("/queue-test")}
-        style={styles.testButton}
-      >
-        <Text style={styles.testButtonText}>
-          Test Supabase Queue
-        </Text>
-      </Pressable>
     </ScrollView>
   );
 }

@@ -1,29 +1,19 @@
-
 import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  content: {
-    padding: 24,
-    paddingBottom: 30,
-  },
-
+  container: { flex: 1 },
+  content: { padding: 24, paddingBottom: 30 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 24,
   },
-
   logoText: {
     fontSize: 22,
     fontWeight: "700",
     color: "#2563EB",
   },
-
   profileButton: {
     width: 42,
     height: 42,
@@ -32,18 +22,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  greeting: {
-    fontSize: 16,
-    marginBottom: 6,
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    marginBottom: 20,
-  },
-
+  greeting: { fontSize: 16, marginBottom: 6 },
+  title: { fontSize: 28, fontWeight: "700", marginBottom: 20 },
   adminButton: {
     backgroundColor: "#0F766E",
     padding: 16,
@@ -54,13 +34,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-
   adminButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
   },
-
   searchInput: {
     height: 50,
     borderWidth: 1,
@@ -68,33 +46,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 28,
   },
-
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 14,
   },
-
-  errorText: {
-    color: "#DC2626",
-    marginBottom: 12,
-  },
-
-  emptyText: {
-    marginBottom: 16,
-  },
-
-  testButton: {
-    padding: 16,
-    backgroundColor: "#2563EB",
-    borderRadius: 10,
-    marginTop: 16,
-  },
-
-  testButtonText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-  },
+  errorText: { color: "#DC2626", marginBottom: 12 },
+  emptyText: { marginBottom: 16 },
 });
 
 export default styles;
