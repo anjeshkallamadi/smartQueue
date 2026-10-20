@@ -104,6 +104,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 15,
   },
+  
+  toggleButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  pauseButton: {
+    backgroundColor: "#64748B",
+  },
+
+  resumeButton: {
+    backgroundColor: "#15803D",
+  },
+
 });
 
 export default styles;

@@ -15,6 +15,8 @@ import styles from "../../styles/adminDashboardStyles";
 
 import {
   adminCallNext,
+  adminPauseQueue,
+  adminResumeQueue,
   adminSkipCurrent,
   checkIsAdmin,
   getMyManagedQueues,
@@ -84,13 +86,14 @@ export default function AdminDashboard() {
 
             try {
               const result = await adminCallNext(queue.queue_id);
-
               await loadQueues();
 
               Alert.alert(
                 result ? "Token Called" : "No Waiting Tokens",
                 result
-                  ? `Now serving A${String(result.token_number).padStart(3, "0")}`
+                  ? `Now serving A${String(
+                      result.token_number
+                    ).padStart(3, "0")}`
                   : "No waiting customers remain."
               );
             } catch (err) {
@@ -116,7 +119,10 @@ export default function AdminDashboard() {
 
     Alert.alert(
       "Skip Current Token",
-      `Skip token A${String(queue.called_token).padStart(3, "0")} for ${queue.service_name}?\n\nThe next waiting token will NOT be called automatically.`,
+      `Skip token A${String(queue.called_token).padStart(
+        3,
+        "0"
+      )} for ${queue.service_name}?\n\nThe next waiting token will NOT be called automatically.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -130,7 +136,6 @@ export default function AdminDashboard() {
               const skippedToken = await adminSkipCurrent(
                 queue.queue_id
               );
-
               await loadQueues();
 
               Alert.alert(
@@ -138,7 +143,10 @@ export default function AdminDashboard() {
                   ? "Token Skipped"
                   : "No Active Token",
                 skippedToken !== null
-                  ? `A${String(skippedToken).padStart(3, "0")} was skipped. Press Call Next when ready.`
+                  ? `A${String(skippedToken).padStart(
+                      3,
+                      "0"
+                    )} was skipped. Press Call Next when ready.`
                   : "No token is currently being served."
               );
             } catch (err) {
@@ -147,6 +155,56 @@ export default function AdminDashboard() {
                 err instanceof Error
                   ? err.message
                   : "Unable to skip the current token."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleQueue = (queue: ManagedQueue) => {
+    if (busyQueueId !== null) return;
+
+    const isPaused = queue.queue_status === "paused";
+    const action = isPaused ? "Resume" : "Pause";
+
+    Alert.alert(
+      `${action} Queue`,
+      isPaused
+        ? `Resume ${queue.service_name}? Customers can join and queue operations will be enabled.`
+        : `Pause ${queue.service_name}? New joins and token operations will be temporarily disabled. Existing tokens will be preserved.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: action,
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+
+            try {
+              if (isPaused) {
+                await adminResumeQueue(queue.queue_id);
+              } else {
+                await adminPauseQueue(queue.queue_id);
+              }
+
+              await loadQueues();
+
+              Alert.alert(
+                isPaused ? "Queue Resumed" : "Queue Paused",
+                `${queue.service_name} is now ${
+                  isPaused ? "active" : "paused"
+                }.`
+              );
+            } catch (err) {
+              Alert.alert(
+                `${action} Failed`,
+                err instanceof Error
+                  ? err.message
+                  : "Unable to update queue status."
               );
             } finally {
               setBusyQueueId(null);
@@ -202,13 +260,17 @@ export default function AdminDashboard() {
         queues.map((queue) => {
           const isBusy = busyQueueId !== null;
           const isActive = queue.queue_status === "active";
+          const isPaused = queue.queue_status === "paused";
+
+          const canCallNext = isActive && !isBusy;
 
           const canSkip =
             isActive &&
             queue.called_token !== null &&
             !isBusy;
 
-          const canCallNext = isActive && !isBusy;
+          const canToggle =
+            (isActive || isPaused) && !isBusy;
 
           return (
             <View key={queue.queue_id} style={styles.card}>
@@ -224,7 +286,10 @@ export default function AdminDashboard() {
                 Now Serving:{" "}
                 {queue.called_token === null
                   ? "None"
-                  : `A${String(queue.called_token).padStart(3, "0")}`}
+                  : `A${String(queue.called_token).padStart(
+                      3,
+                      "0"
+                    )}`}
               </Text>
 
               <Text style={styles.detail}>
@@ -267,9 +332,30 @@ export default function AdminDashboard() {
                 </Pressable>
               </View>
 
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.toggleButton,
+                  isPaused
+                    ? styles.resumeButton
+                    : styles.pauseButton,
+                  !canToggle && styles.disabled,
+                ]}
+                disabled={!canToggle}
+                onPress={() => handleToggleQueue(queue)}
+              >
+                <Text style={styles.buttonText}>
+                  {busyQueueId === queue.queue_id
+                    ? "Processing..."
+                    : isPaused
+                    ? "Resume Queue"
+                    : "Pause Queue"}
+                </Text>
+              </Pressable>
+
               <Text style={styles.helperText}>
-                Skip marks the current token as skipped.
-                Call Next is a separate action.
+                Skip does not call the next token.
+                Pausing preserves all existing tokens.
               </Text>
             </View>
           );

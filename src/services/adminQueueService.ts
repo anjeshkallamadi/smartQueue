@@ -76,3 +76,35 @@ export async function adminSkipCurrent(
   return data as number | null;
 }
 
+
+export async function adminPauseQueue(
+  queueId: string
+): Promise<string> {
+  const { data, error } = await supabase.rpc(
+    "admin_pause_queue",
+    { p_queue_id: queueId }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as string;
+}
+
+export async function adminResumeQueue(
+  queueId: string
+): Promise<string> {
+  const { data, error } = await supabase.rpc(
+    "admin_resume_queue",
+    { p_queue_id: queueId }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as string;
+}
+
+
