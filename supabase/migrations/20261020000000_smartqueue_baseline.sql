@@ -286,7 +286,7 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Queue not found';
     END IF;
-    IF v_queue_status <> 'active' THEN
+    IF v_queue_status IS DISTINCT FROM 'active' THEN
         RAISE EXCEPTION 'Queue must be active';
     END IF;
 
@@ -333,7 +333,7 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Queue not found';
     END IF;
-    IF v_queue_status <> 'active' THEN
+    IF v_queue_status IS DISTINCT FROM 'active' THEN
         RAISE EXCEPTION 'Queue must be active';
     END IF;
 
@@ -370,7 +370,7 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Queue not found';
     END IF;
-    IF v_status <> 'active' THEN
+    IF v_status IS DISTINCT FROM 'active' THEN
         RAISE EXCEPTION 'Only active queues can be paused';
     END IF;
     UPDATE public.queues SET status = 'paused' WHERE id = p_queue_id;
@@ -395,7 +395,7 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Queue not found';
     END IF;
-    IF v_status <> 'paused' THEN
+    IF v_status IS DISTINCT FROM 'paused' THEN
         RAISE EXCEPTION 'Only paused queues can be resumed';
     END IF;
     UPDATE public.queues SET status = 'active' WHERE id = p_queue_id;
