@@ -1,57 +1,63 @@
-# SmartQueue PR #12 — review fixes
+# SmartQueue PR #12 — database baseline and validation
 
-Prepared 2026-10-20 from the connected **SmartQueue** Supabase project's PostgreSQL catalogs and the current `feature/admin-dashboard` GitHub branch. **No live database schema or repository files were modified while preparing this package.**
+Updated 2026-10-20 for [PR #12](https://github.com/anjeshkallamadi/smartQueue/pull/12).
+The migration was reconstructed from the existing SmartQueue Supabase PostgreSQL catalog and targets a **fresh Supabase local database**. It does not export live users or queue records.
 
-## Package contents
+## Changed files
 
-- `supabase/migrations/20261020000000_smartqueue_baseline.sql` — baseline schema migration for a **fresh Supabase project**.
-- `src/app/home.tsx` — removes the development-only `/queue-test` navigation button. Other Home features remain.
-- `styles/homeStyles.ts` — removes unused `testButton` and `testButtonText` styles.
+- supabase/migrations/20261020000000_smartqueue_baseline.sql — new-project database schema and privileges.
+- supabase/tests/database/smartqueue_security.test.sql — 44 pgTAP assertions using synthetic identities.
+- .github/workflows/database-validation.yml — isolated local Supabase validation in GitHub Actions.
+- src/app/home.tsx and styles/homeStyles.ts — removed development-only queue-test navigation and styles.
 
-Copy these paths into your local repository (preserving the folders) on `feature/admin-dashboard`, then examine the changes with `git diff` before committing.
+## Baseline contents
 
-## Captured database objects
+- Five tables: users, services, queues, queue_entries and notifications; deployed column defaults, keys and references.
+- Token-uniqueness/active-entry indexes and service-owner index.
+- Owner/admin and customer RPCs: is_queue_admin, can_manage_queue, join_queue_secure, get_my_queue_position, get_queue_now_serving, get_my_managed_queues, admin_call_next, admin_skip_current, admin_pause_queue and admin_resume_queue.
+- Signup and queue-entry trigger functions, RLS policies, grants and queues Realtime publication membership.
+- NULL-safe IS DISTINCT FROM guards in all four admin state-changing functions.
 
-- 5 tables and their observed data types, nullability, defaults, foreign keys, primary keys, and table comments.
-- Partial unique index for one active queue entry per user/queue; unique `(queue_id, token_number)` index; service owner index.
-- 10 app-callable SQL functions: `is_queue_admin`, `can_manage_queue`, `join_queue_secure`, `get_my_queue_position`, `get_queue_now_serving`, `get_my_managed_queues`, `admin_call_next`, `admin_skip_current`, `admin_pause_queue`, and `admin_resume_queue`.
-- 2 trigger helpers: `handle_new_user`, `signal_queue_entry_change`; triggers on `auth.users` and `public.queue_entries`.
-- RLS and client grants, plus adding `public.queues` to `supabase_realtime` publication (when publication exists).
+## Fresh local Supabase validation: PASS
 
-**No rows from application tables or Supabase Auth were exported.** Sample users, service records, and admin ownership assignments are **not included**. A new database will need test users and an owner-assigned service/active queue to reproduce the mobile demo.
+**CI run:** [SmartQueue database validation, run #2](https://github.com/anjeshkallamadi/smartQueue/actions/runs/39462171544)
 
-## Important differences from the live project's legacy grants/policies
+**Environment:** A disposable local Supabase stack on GitHub-hosted Ubuntu using the official Supabase CLI; no connection to the live SmartQueue project.
 
-The SQL is based on deployed schema and function definitions, but it is **not a byte-for-byte permissions dump**. The current live project still has broad historical table privileges (including `TRUNCATE` for some app roles) and legacy queue-entry INSERT/UPDATE and admin-notification policies. These are not needed for secure RPC-based queue management, and `TRUNCATE` bypasses RLS.
+**Result on 2026-10-20:** Supabase initialized and applied the baseline on the fresh local database successfully. The database test command reported **Files=1, Tests=44, Result: PASS**. Workflow teardown also succeeded.
 
-The **fresh-database baseline intentionally restricts** `anon` and `authenticated` table privileges to required operations, removes obsolete direct queue-entry mutation policies, and defers notification creation. This is a proposed security hardening, not a change already applied to the live project. **Reviewer should approve these differences**; permissions in the live project should be reconciled in a separately reviewed migration, rather than silently assumed consistent.
+The [versioned pgTAP tests](../supabase/tests/database/smartqueue_security.test.sql) cover all five tables, important RPCs, signup-to-profile trigger, publication membership, RLS and table grants, self-only row access, join idempotency, unique token issuance, queue position, Realtime version increments, non-owner denial for all four admin actions, owner Call Next/Skip/Pause/Resume, paused-queue join denial and all four NULL-status guards.
 
-The live project also has `queues.status DEFAULT 'waiting'` despite app logic using `'active'` for joinable queues. The baseline preserves this deployed default. Future queue-creation functions should explicitly set `status` and enforce ownership. No service-creation, queue-creation, or notification-generation RPCs are included.
+**Scope limits:** CI does not test simultaneous/concurrent joins, actual Realtime WebSocket delivery, the mobile app UI or unfinished notification flows. These remain separate validation tasks.
 
-## IMPORTANT: Do not run the baseline against the current live database
+## Difference from live database privileges
 
-This migration uses `CREATE TABLE` and targets a new project. The existing linked database **already contains** these tables. Running this file directly in its SQL Editor, or running `db push` against the existing project without correctly baselining migration history, will fail or risk overwriting your workflow. Do not run `db reset` against any database containing records you want to keep.
+The live project still has some legacy broader grants (including TRUNCATE) and older queue-entry mutation and notification policies. TRUNCATE bypasses RLS. The fresh-environment baseline proposes tighter authenticated/anon permissions, no direct queue-entry mutations and a restricted notification flow. These intentional differences must be reviewed and, if approved, deployed to the live database in a separate controlled migration.
 
-To establish this as the initial migration in the currently deployed Supabase project, after reviewer approval use the official Supabase CLI migration-history workflow and verify it does not reapply the baseline. Marking migration history is a separate controlled step. `supabase db pull` with Docker is the preferred definitive export when available.
+The live queues.status column is nullable and defaults to waiting. The baseline preserves this deployed schema. It now contains NULL-safe guards, but **live admin RPCs have not yet been updated** with those guards. No service-creation, queue-creation or notification-generation RPCs are included.
 
-## Local checks before asking for another review
+## IMPORTANT: Never apply this baseline to the existing live database
 
-In the project root:
+The SQL includes CREATE TABLE statements and is for **new database instances**. Do not paste the baseline into the live SQL editor; do not run db reset or db push against the linked project. Before using versioned migrations against the existing project, reconcile its migration history in a separately reviewed procedure. This validation did not change live data, schema, permissions or tokens.
 
-```powershell
+## Reproduce validation
+
+On a Docker-enabled machine, from the repository root:
+
+~~~powershell
+supabase init
+supabase start
+supabase test db
+supabase stop --no-backup
+~~~
+
+Alternatively, push changes to the supabase directory on a PR targeting main: GitHub Actions runs the tests on its isolated runner with no live Supabase credentials.
+
+For the React Native project, also run:
+
+~~~powershell
 npx tsc --noEmit
 git diff --check
-git status
-```
+~~~
 
-On a fresh, isolated Supabase environment with a compatible auth schema, a reviewer should apply the migration and test: signup trigger; normal user's row access and join; second-join idempotency; concurrent joins; non-owner admin RPC denial; owner Call Next/Skip/Pause/Resume; Realtime events; queue position; notifications visibility. **This fresh-database apply was not executed here because Docker/local PostgreSQL is not available.**
-
-After checks, stage only these paths:
-
-```powershell
-git add supabase/migrations/20261020000000_smartqueue_baseline.sql src/app/home.tsx styles/homeStyles.ts
-git commit -m "Add SmartQueue database baseline and remove test route button"
-git push origin feature/admin-dashboard
-```
-
-This updates existing PR #12 automatically. Do not stage unrelated `.vscode/settings.json` or untracked `src/app/queue-test.tsx`.
+Independent reviewer approval remains necessary before merging PR #12.
