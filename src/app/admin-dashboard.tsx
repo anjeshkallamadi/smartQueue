@@ -2,20 +2,23 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
+
 import styles from "../../styles/adminDashboardStyles";
+
 import {
-    adminCallNext,
-    checkIsAdmin,
-    getMyManagedQueues,
-    type ManagedQueue,
+  adminCallNext,
+  adminSkipCurrent,
+  checkIsAdmin,
+  getMyManagedQueues,
+  type ManagedQueue,
 } from "../services/adminQueueService";
 
 export default function AdminDashboard() {
@@ -43,7 +46,9 @@ export default function AdminDashboard() {
     } catch (err) {
       setQueues([]);
       setError(
-        err instanceof Error ? err.message : "Unable to load queues."
+        err instanceof Error
+          ? err.message
+          : "Unable to load queues."
       );
     } finally {
       setLoading(false);
@@ -64,7 +69,7 @@ export default function AdminDashboard() {
   };
 
   const handleCallNext = (queue: ManagedQueue) => {
-    if (busyQueueId) return;
+    if (busyQueueId !== null) return;
 
     Alert.alert(
       "Call Next Token",
@@ -74,10 +79,13 @@ export default function AdminDashboard() {
         {
           text: "Call Next",
           onPress: async () => {
+            if (busyQueueId !== null) return;
             setBusyQueueId(queue.queue_id);
 
             try {
               const result = await adminCallNext(queue.queue_id);
+
+              await loadQueues();
 
               Alert.alert(
                 result ? "Token Called" : "No Waiting Tokens",
@@ -85,14 +93,60 @@ export default function AdminDashboard() {
                   ? `Now serving A${String(result.token_number).padStart(3, "0")}`
                   : "No waiting customers remain."
               );
-
-              await loadQueues();
             } catch (err) {
               Alert.alert(
                 "Operation Failed",
                 err instanceof Error
                   ? err.message
                   : "Unable to call next token."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSkipToken = (queue: ManagedQueue) => {
+    if (busyQueueId !== null || queue.called_token === null) {
+      return;
+    }
+
+    Alert.alert(
+      "Skip Current Token",
+      `Skip token A${String(queue.called_token).padStart(3, "0")} for ${queue.service_name}?\n\nThe next waiting token will NOT be called automatically.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Skip Token",
+          style: "destructive",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+
+            try {
+              const skippedToken = await adminSkipCurrent(
+                queue.queue_id
+              );
+
+              await loadQueues();
+
+              Alert.alert(
+                skippedToken !== null
+                  ? "Token Skipped"
+                  : "No Active Token",
+                skippedToken !== null
+                  ? `A${String(skippedToken).padStart(3, "0")} was skipped. Press Call Next when ready.`
+                  : "No token is currently being served."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Skip Failed",
+                err instanceof Error
+                  ? err.message
+                  : "Unable to skip the current token."
               );
             } finally {
               setBusyQueueId(null);
@@ -119,6 +173,7 @@ export default function AdminDashboard() {
       </Pressable>
 
       <Text style={styles.title}>Admin Dashboard</Text>
+
       <Text style={styles.subtitle}>
         Manage queues belonging to your services.
       </Text>
@@ -144,48 +199,81 @@ export default function AdminDashboard() {
       {!loading &&
         !error &&
         isAdmin &&
-        queues.map((queue) => (
-          <View key={queue.queue_id} style={styles.card}>
-            <Text style={styles.serviceName}>
-              {queue.service_name}
-            </Text>
+        queues.map((queue) => {
+          const isBusy = busyQueueId !== null;
+          const isActive = queue.queue_status === "active";
 
-            <Text style={styles.detail}>
-              Queue Status: {queue.queue_status}
-            </Text>
+          const canSkip =
+            isActive &&
+            queue.called_token !== null &&
+            !isBusy;
 
-            <Text style={styles.detail}>
-              Now Serving:{" "}
-              {queue.called_token === null
-                ? "None"
-                : `A${String(queue.called_token).padStart(3, "0")}`}
-            </Text>
+          const canCallNext = isActive && !isBusy;
 
-            <Text style={styles.detail}>
-              Waiting Customers: {queue.waiting_count}
-            </Text>
-
-            <Pressable
-              style={[
-                styles.button,
-                (busyQueueId !== null ||
-                  queue.queue_status !== "active") &&
-                  styles.disabled,
-              ]}
-              disabled={
-                busyQueueId !== null ||
-                queue.queue_status !== "active"
-              }
-              onPress={() => handleCallNext(queue)}
-            >
-              <Text style={styles.buttonText}>
-                {busyQueueId === queue.queue_id
-                  ? "Processing..."
-                  : "Call Next"}
+          return (
+            <View key={queue.queue_id} style={styles.card}>
+              <Text style={styles.serviceName}>
+                {queue.service_name}
               </Text>
-            </Pressable>
-          </View>
-        ))}
+
+              <Text style={styles.detail}>
+                Queue Status: {queue.queue_status}
+              </Text>
+
+              <Text style={styles.detail}>
+                Now Serving:{" "}
+                {queue.called_token === null
+                  ? "None"
+                  : `A${String(queue.called_token).padStart(3, "0")}`}
+              </Text>
+
+              <Text style={styles.detail}>
+                Waiting Customers: {queue.waiting_count}
+              </Text>
+
+              <View style={styles.buttonRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={[
+                    styles.button,
+                    styles.callButton,
+                    !canCallNext && styles.disabled,
+                  ]}
+                  disabled={!canCallNext}
+                  onPress={() => handleCallNext(queue)}
+                >
+                  <Text style={styles.buttonText}>
+                    {busyQueueId === queue.queue_id
+                      ? "Processing..."
+                      : "Call Next"}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  style={[
+                    styles.button,
+                    styles.skipButton,
+                    !canSkip && styles.disabled,
+                  ]}
+                  disabled={!canSkip}
+                  onPress={() => handleSkipToken(queue)}
+                >
+                  <Text style={styles.buttonText}>
+                    {busyQueueId === queue.queue_id
+                      ? "Processing..."
+                      : "Skip Token"}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Text style={styles.helperText}>
+                Skip marks the current token as skipped.
+                Call Next is a separate action.
+              </Text>
+            </View>
+          );
+        })}
     </ScrollView>
   );
 }
