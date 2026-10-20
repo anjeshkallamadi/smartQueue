@@ -60,3 +60,19 @@ export async function adminCallNext(
 
   return (data as AdminCalledEntry[] | null)?.[0] ?? null;
 }
+
+export async function adminSkipCurrent(
+  queueId: string
+): Promise<number | null> {
+  const { data, error } = await supabase.rpc(
+    "admin_skip_current",
+    { p_queue_id: queueId }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as number | null;
+}
+
