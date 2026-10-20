@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/**'
+      - 'docs/README_REVIEW.md'
       - '.github/workflows/database-validation.yml'
   workflow_dispatch:
 
