@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import styles from "../../styles/queueDetailsStyles";
+import { supabase } from "../lib/supabase";
 
 import {
   formatQueueToken,
@@ -18,7 +19,7 @@ import {
   getMyQueuePosition,
   getNowServingToken,
   getSupabaseQueue,
-  joinSupabaseQueue
+  joinSupabaseQueue,
 } from "../services/supabaseQueueService";
 
 type MyEntry = {
@@ -38,16 +39,13 @@ export default function QueueDetails() {
     }>();
 
   const [entry, setEntry] = useState<MyEntry | null>(null);
-
   const [queueStatus, setQueueStatus] = useState("");
   const [averageMinutes, setAverageMinutes] =
     useState<number | null>(null);
-
   const [peopleAhead, setPeopleAhead] =
     useState<number | null>(null);
-
   const [nowServing, setNowServing] =
-  useState<number | null>(null);
+    useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -59,19 +57,18 @@ export default function QueueDetails() {
 
   const joinInProgress = useRef(false);
 
-  // Load queue information and the user's saved entry.
   const loadDetails = useCallback(async () => {
     if (!queueId) {
       setMessage("No queue ID was provided.");
       setEntry(null);
       setPeopleAhead(null);
+      setNowServing(null);
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
     try {
-      setMessage(null);
       setPositionError(null);
 
       const [queue, myEntry, currentServing] =
@@ -79,12 +76,11 @@ export default function QueueDetails() {
           getSupabaseQueue(queueId),
           getMyActiveQueueEntry(queueId),
           getNowServingToken(queueId),
-      ]);
-
-      setNowServing(currentServing);
+        ]);
 
       setQueueStatus(queue.status);
       setAverageMinutes(queue.average_service_time);
+      setNowServing(currentServing);
       setEntry(myEntry);
       setPeopleAhead(null);
 
@@ -119,15 +115,54 @@ export default function QueueDetails() {
     }
   }, [queueId]);
 
-  // Refresh whenever the screen becomes active.
+  // Load data and subscribe to queue changes while
+  // this screen is focused.
   useFocusEffect(
     useCallback(() => {
+      let active = true;
+
       setLoading(true);
       void loadDetails();
-    }, [loadDetails])
+
+      if (!queueId) {
+        return () => {
+          active = false;
+        };
+      }
+
+      const channel = supabase
+        .channel(`queue-updates-${queueId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "queues",
+            filter: `id=eq.${queueId}`,
+          },
+          () => {
+            if (active) {
+              void loadDetails();
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (active && status === "SUBSCRIBED") {
+            // Fetch again after connecting to avoid
+            // missing changes during subscription setup.
+            void loadDetails();
+          }
+        });
+
+      return () => {
+        active = false;
+
+        // Disconnect when leaving the screen.
+        void supabase.removeChannel(channel);
+      };
+    }, [queueId, loadDetails])
   );
 
-  // Pull down to refresh queue position.
   const handleRefresh = async () => {
     if (refreshing || joining) return;
 
@@ -135,7 +170,6 @@ export default function QueueDetails() {
     await loadDetails();
   };
 
-  // Join the queue through the secure Supabase RPC.
   const handleJoin = async () => {
     if (
       !queueId ||
@@ -163,8 +197,10 @@ export default function QueueDetails() {
       });
 
       setPeopleAhead(result.people_ahead);
-
       setMessage("Successfully joined the queue!");
+
+      // Synchronize after joining.
+      await loadDetails();
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -201,7 +237,6 @@ export default function QueueDetails() {
         />
       }
     >
-      {/* Service information */}
       <Text style={styles.serviceName}>
         {serviceName ?? "Service"}
       </Text>
@@ -211,7 +246,6 @@ export default function QueueDetails() {
           "View queue information and join remotely."}
       </Text>
 
-      {/* Current queue information */}
       <Text style={styles.sectionTitle}>
         Current Queue
       </Text>
@@ -234,8 +268,8 @@ export default function QueueDetails() {
 
           <Text style={styles.infoValue}>
             {nowServing === null
-            ? "None"
-            : formatQueueToken(nowServing)}
+              ? "None"
+              : formatQueueToken(nowServing)}
           </Text>
         </View>
 
@@ -257,7 +291,6 @@ export default function QueueDetails() {
         </View>
       </View>
 
-      {/* Loading indicator */}
       {loading && (
         <ActivityIndicator
           size="large"
@@ -265,7 +298,6 @@ export default function QueueDetails() {
         />
       )}
 
-      {/* Join queue button */}
       <Pressable
         style={[
           styles.joinButton,
@@ -290,7 +322,6 @@ export default function QueueDetails() {
         </Text>
       </Pressable>
 
-      {/* Success or error message */}
       {message && (
         <Text
           style={styles.message}
@@ -300,7 +331,6 @@ export default function QueueDetails() {
         </Text>
       )}
 
-      {/* User's active queue entry */}
       {entry && (
         <View style={styles.resultCard}>
           <Text style={styles.tokenLabel}>
@@ -308,9 +338,7 @@ export default function QueueDetails() {
           </Text>
 
           <Text style={styles.token}>
-            {formatQueueToken(
-              entry.token_number
-            )}
+            {formatQueueToken(entry.token_number)}
           </Text>
 
           <View style={styles.resultRow}>
