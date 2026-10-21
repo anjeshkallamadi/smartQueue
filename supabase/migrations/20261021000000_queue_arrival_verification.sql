@@ -111,24 +111,16 @@ BEGIN
       RAISE EXCEPTION 'Queue is not active';
     END IF;
 
-    UPDATE public.queues q
-    SET current_token = GREATEST(
-      COALESCE(q.current_token, 0),
-      COALESCE((
-        SELECT MAX(qe.token_number)
-        FROM public.queue_entries qe
-        WHERE qe.queue_id = p_queue_id
-      ), 0)
-    ) + 1
-    WHERE q.id = p_queue_id
-    RETURNING q.current_token INTO v_token;
-
+    -- Do not allocate a token until arrival is verified. This prevents pending
+    -- requests from reserving queue order or jumping ahead of checked-in users.
     INSERT INTO public.queue_entries (
       queue_id, user_id, token_number, status
     ) VALUES (
-      p_queue_id, v_user_id, v_token, 'pending_verification'
+      p_queue_id, v_user_id, NULL, 'pending_verification'
     )
     RETURNING id, status INTO v_entry_id, v_status;
+
+    v_token := NULL;
   END IF;
 
   RETURN QUERY
@@ -210,6 +202,7 @@ CREATE OR REPLACE FUNCTION public.verify_queue_arrival(
 AS $function$
 DECLARE
   v_user_id uuid;
+  v_queue_status text;
   v_entry_id uuid;
   v_token integer;
   v_status text;
@@ -222,14 +215,22 @@ BEGIN
     RAISE EXCEPTION 'A valid queue QR code is required';
   END IF;
 
+  -- Serialize token assignment with other arrivals and staff queue actions.
+  SELECT q.status INTO v_queue_status
+  FROM public.queues q
+  WHERE q.id = p_queue_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_queue_status IS DISTINCT FROM 'active' THEN
+    RAISE EXCEPTION 'Queue is not active';
+  END IF;
+
   PERFORM 1
   FROM public.queue_checkin_codes c
-  JOIN public.queues q ON q.id = c.queue_id
   WHERE c.queue_id = p_queue_id
     AND c.code = trim(p_code)
     AND c.revoked_at IS NULL
-    AND c.expires_at > now()
-    AND q.status = 'active';
+    AND c.expires_at > now();
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'This check-in QR is invalid or expired. Ask staff for the current QR code.';
@@ -250,8 +251,21 @@ BEGIN
   END IF;
 
   IF v_status = 'pending_verification' THEN
+    UPDATE public.queues q
+    SET current_token = GREATEST(
+      COALESCE(q.current_token, 0),
+      COALESCE((
+        SELECT MAX(qe.token_number)
+        FROM public.queue_entries qe
+        WHERE qe.queue_id = p_queue_id
+      ), 0)
+    ) + 1
+    WHERE q.id = p_queue_id
+    RETURNING q.current_token INTO v_token;
+
     UPDATE public.queue_entries qe
     SET status = 'waiting',
+        token_number = v_token,
         arrival_verified_at = now()
     WHERE qe.id = v_entry_id
     RETURNING qe.status INTO v_status;
@@ -350,6 +364,8 @@ CREATE OR REPLACE FUNCTION public.admin_verify_pending_entry(p_entry_id uuid)
 AS $function$
 DECLARE
   v_queue_id uuid;
+  v_queue_status text;
+  v_token integer;
 BEGIN
   SELECT qe.queue_id INTO v_queue_id
   FROM public.queue_entries qe
@@ -364,8 +380,30 @@ BEGIN
     RAISE EXCEPTION 'Access denied: not the service owner';
   END IF;
 
+  SELECT q.status INTO v_queue_status
+  FROM public.queues q
+  WHERE q.id = v_queue_id
+  FOR UPDATE;
+
+  IF v_queue_status IS DISTINCT FROM 'active' THEN
+    RAISE EXCEPTION 'Queue must be active to verify arrival';
+  END IF;
+
+  UPDATE public.queues q
+  SET current_token = GREATEST(
+    COALESCE(q.current_token, 0),
+    COALESCE((
+      SELECT MAX(qe.token_number)
+      FROM public.queue_entries qe
+      WHERE qe.queue_id = v_queue_id
+    ), 0)
+  ) + 1
+  WHERE q.id = v_queue_id
+  RETURNING q.current_token INTO v_token;
+
   UPDATE public.queue_entries
   SET status = 'waiting',
+      token_number = v_token,
       arrival_verified_at = now()
   WHERE id = p_entry_id;
 
