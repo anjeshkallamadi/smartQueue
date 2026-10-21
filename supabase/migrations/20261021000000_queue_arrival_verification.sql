@@ -545,44 +545,25 @@ BEGIN
   END IF;
 
   UPDATE public.queue_entries qe
-  SET status = CASE
-        WHEN qe.called_at IS NOT NULL
-         AND qe.called_at <= now() - (
-           COALESCE((
-             SELECT q.no_show_grace_minutes
-             FROM public.queues q
-             WHERE q.id = p_queue_id
-           ), 3) * interval '1 minute'
-         )
-        THEN 'no_show'
-        ELSE 'completed'
-      END,
-      served_at = CASE
-        WHEN qe.called_at IS NOT NULL
-         AND qe.called_at <= now() - (
-           COALESCE((
-             SELECT q.no_show_grace_minutes
-             FROM public.queues q
-             WHERE q.id = p_queue_id
-           ), 3) * interval '1 minute'
-         )
-        THEN qe.served_at
-        ELSE now()
-      END,
-      no_show_at = CASE
-        WHEN qe.called_at IS NOT NULL
-         AND qe.called_at <= now() - (
-           COALESCE((
-             SELECT q.no_show_grace_minutes
-             FROM public.queues q
-             WHERE q.id = p_queue_id
-           ), 3) * interval '1 minute'
-         )
-        THEN now()
-        ELSE qe.no_show_at
-      END
+  SET status = 'no_show',
+      no_show_at = now()
   WHERE qe.queue_id = p_queue_id
-    AND qe.status = 'called';
+    AND qe.status = 'called'
+    AND qe.called_at IS NOT NULL
+    AND qe.called_at <= now() - (
+      COALESCE((
+        SELECT q.no_show_grace_minutes
+        FROM public.queues q
+        WHERE q.id = p_queue_id
+      ), 3) * interval '1 minute'
+    );
+
+  IF EXISTS (
+    SELECT 1 FROM public.queue_entries qe
+    WHERE qe.queue_id = p_queue_id AND qe.status = 'called'
+  ) THEN
+    RAISE EXCEPTION 'The current token is still called. Mark it served or no-show before calling next.';
+  END IF;
 
   SELECT qe.id, qe.token_number
   INTO v_next_entry_id, v_next_token
@@ -604,6 +585,63 @@ BEGIN
 
   RETURN QUERY
   SELECT v_next_entry_id, v_next_token, 'called'::text;
+END;
+$function$;
+
+-- Serving and calling the next customer are separate operations.
+CREATE OR REPLACE FUNCTION public.admin_complete_current(p_queue_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_queue_status text;
+  v_entry_id uuid;
+  v_token integer;
+  v_called_at timestamptz;
+  v_grace integer;
+BEGIN
+  IF NOT public.can_manage_queue(p_queue_id) THEN
+    RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+
+  SELECT q.status, q.no_show_grace_minutes
+  INTO v_queue_status, v_grace
+  FROM public.queues q
+  WHERE q.id = p_queue_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Queue not found';
+  END IF;
+  IF v_queue_status IS DISTINCT FROM 'active' THEN
+    RAISE EXCEPTION 'Queue must be active';
+  END IF;
+
+  SELECT qe.id, qe.token_number, qe.called_at
+  INTO v_entry_id, v_token, v_called_at
+  FROM public.queue_entries qe
+  WHERE qe.queue_id = p_queue_id AND qe.status = 'called'
+  ORDER BY qe.token_number
+  LIMIT 1
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No currently called token to mark as served';
+  END IF;
+
+  IF v_called_at IS NOT NULL
+     AND v_called_at <= now() - (COALESCE(v_grace, 3) * interval '1 minute') THEN
+    RAISE EXCEPTION 'The no-show grace period has elapsed. Mark this token as no-show instead.';
+  END IF;
+
+  UPDATE public.queue_entries
+  SET status = 'completed',
+      served_at = now()
+  WHERE id = v_entry_id;
+
+  RETURN v_token;
 END;
 $function$;
 
@@ -662,6 +700,7 @@ $function$;
 -- checks the customer or service-owner identity on the server.
 REVOKE ALL ON FUNCTION public.join_queue_secure(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_call_next(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.admin_complete_current(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_create_queue_checkin_code(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.verify_queue_arrival(uuid, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.cancel_my_queue_entry(uuid) FROM PUBLIC, anon, authenticated;
@@ -675,6 +714,7 @@ REVOKE ALL ON FUNCTION public.admin_set_no_show_grace(uuid, integer) FROM PUBLIC
 
 GRANT EXECUTE ON FUNCTION public.join_queue_secure(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_call_next(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_complete_current(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_create_queue_checkin_code(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.verify_queue_arrival(uuid, text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.cancel_my_queue_entry(uuid) TO authenticated, service_role;
