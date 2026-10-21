@@ -462,6 +462,110 @@ export default function AdminDashboard() {
               <Text style={styles.detail}>
                 Waiting Customers: {queue.waiting_count}
               </Text>
+              <Text style={styles.detail}>
+                Pending Verification: {queue.pending_entries?.length ?? 0}
+              </Text>
+
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.toggleButton,
+                  styles.callButton,
+                  busyQueueId !== null && styles.disabled,
+                ]}
+                disabled={busyQueueId !== null}
+                onPress={() => void handleCreateCheckinQr(queue)}
+              >
+                <Text style={styles.buttonText}>
+                  {busyQueueId === queue.queue_id
+                    ? "Processing..."
+                    : "Generate / Refresh Check-in QR"}
+                </Text>
+              </Pressable>
+
+              {queue.checkin_code && queue.checkin_expires_at && (
+                <View
+                  style={{
+                    alignItems: "center",
+                    backgroundColor: "#F9FAFB",
+                    borderRadius: 12,
+                    padding: 14,
+                    marginTop: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <QRCode
+                    value={JSON.stringify({
+                      type: "smartqueue-checkin",
+                      queueId: queue.queue_id,
+                      code: queue.checkin_code,
+                    })}
+                    size={190}
+                    quietZone={10}
+                  />
+                  <Text style={styles.detail}>
+                    Show this QR at the service location.
+                  </Text>
+                  <Text style={styles.helperText}>
+                    Expires at {new Date(queue.checkin_expires_at).toLocaleTimeString()}.
+                  </Text>
+                </View>
+              )}
+
+              {(queue.pending_entries ?? []).length > 0 && (
+                <View style={{ marginTop: 12, marginBottom: 12 }}>
+                  <Text style={styles.detail}>Pending Arrival Requests</Text>
+                  {(queue.pending_entries ?? []).map((entry) => (
+                    <View
+                      key={entry.entry_id}
+                      style={{
+                        backgroundColor: "#F9FAFB",
+                        borderColor: "#E5E7EB",
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        padding: 12,
+                        marginTop: 10,
+                      }}
+                    >
+                      <Text style={styles.serviceName}>
+                        {entry.customer_name}
+                      </Text>
+                      <Text style={styles.detail}>
+                        Token: A{String(entry.token_number).padStart(3, "0")}
+                      </Text>
+                      <Text style={styles.helperText}>
+                        Requested: {new Date(entry.joined_at).toLocaleString()}
+                      </Text>
+                      <View style={styles.buttonRow}>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={[
+                            styles.button,
+                            styles.callButton,
+                            busyQueueId !== null && styles.disabled,
+                          ]}
+                          disabled={busyQueueId !== null}
+                          onPress={() => handleVerifyArrivalManually(queue, entry)}
+                        >
+                          <Text style={styles.buttonText}>Verify In Person</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={[
+                            styles.button,
+                            styles.skipButton,
+                            busyQueueId !== null && styles.disabled,
+                          ]}
+                          disabled={busyQueueId !== null}
+                          onPress={() => handleRejectPending(queue, entry)}
+                        >
+                          <Text style={styles.buttonText}>Reject</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               <View style={styles.buttonRow}>
                 <Pressable
@@ -498,6 +602,21 @@ export default function AdminDashboard() {
                   </Text>
                 </Pressable>
               </View>
+
+              {queue.called_token !== null && (
+                <Pressable
+                  accessibilityRole="button"
+                  style={[
+                    styles.toggleButton,
+                    styles.skipButton,
+                    (busyQueueId !== null || !isActive) && styles.disabled,
+                  ]}
+                  disabled={busyQueueId !== null || !isActive}
+                  onPress={() => handleMarkCurrentNoShow(queue)}
+                >
+                  <Text style={styles.buttonText}>Mark Current as No-show</Text>
+                </Pressable>
+              )}
 
               <Pressable
                 accessibilityRole="button"
