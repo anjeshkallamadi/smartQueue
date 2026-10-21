@@ -607,6 +607,57 @@ BEGIN
 END;
 $function$;
 
+-- Service owners can adjust their own queue's no-show grace period (1-30 minutes).
+CREATE OR REPLACE FUNCTION public.admin_get_no_show_grace(p_queue_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_minutes integer;
+BEGIN
+  IF NOT public.can_manage_queue(p_queue_id) THEN
+    RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+
+  SELECT q.no_show_grace_minutes INTO v_minutes
+  FROM public.queues q
+  WHERE q.id = p_queue_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Queue not found';
+  END IF;
+
+  RETURN v_minutes;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.admin_set_no_show_grace(
+  p_queue_id uuid,
+  p_minutes integer
+)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF p_minutes IS NULL OR p_minutes < 1 OR p_minutes > 30 THEN
+    RAISE EXCEPTION 'Grace period must be between 1 and 30 minutes';
+  END IF;
+  IF NOT public.can_manage_queue(p_queue_id) THEN
+    RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+
+  UPDATE public.queues
+  SET no_show_grace_minutes = p_minutes
+  WHERE id = p_queue_id;
+
+  RETURN p_minutes;
+END;
+$function$;
+
 -- Access is granted only to authenticated users; each SECURITY DEFINER RPC
 -- checks the customer or service-owner identity on the server.
 REVOKE ALL ON FUNCTION public.join_queue_secure(uuid) FROM PUBLIC, anon, authenticated;
@@ -619,6 +670,8 @@ REVOKE ALL ON FUNCTION public.admin_verify_pending_entry(uuid) FROM PUBLIC, anon
 REVOKE ALL ON FUNCTION public.admin_reject_pending_entry(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_mark_current_no_show(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_expire_no_shows(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.admin_get_no_show_grace(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.admin_set_no_show_grace(uuid, integer) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.join_queue_secure(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_call_next(uuid) TO authenticated, service_role;
@@ -630,5 +683,7 @@ GRANT EXECUTE ON FUNCTION public.admin_verify_pending_entry(uuid) TO authenticat
 GRANT EXECUTE ON FUNCTION public.admin_reject_pending_entry(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_mark_current_no_show(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_expire_no_shows(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_get_no_show_grace(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_set_no_show_grace(uuid, integer) TO authenticated, service_role;
 
 COMMIT;
