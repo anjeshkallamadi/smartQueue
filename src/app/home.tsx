@@ -1,3 +1,4 @@
+
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -19,13 +20,18 @@ import { checkIsAdmin } from "../services/adminQueueService";
 
 import {
   getAvailableServiceQueues,
+  getMyActiveQueues,
   type AvailableServiceQueue,
+  type MyActiveQueue,
 } from "../services/supabaseQueueService";
 
 export default function Home() {
   const [services, setServices] = useState<AvailableServiceQueue[]>([]);
+  const [activeQueue, setActiveQueue] = useState<MyActiveQueue | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeQueueLoading, setActiveQueueLoading] = useState(true);
+  const [activeQueueError, setActiveQueueError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -41,15 +47,36 @@ export default function Home() {
       );
     } finally {
       setLoading(false);
-      setRefreshing(false);
+    }
+  }, []);
+
+  const loadActiveQueue = useCallback(async () => {
+    try {
+      setActiveQueueError(null);
+
+      const queues = await getMyActiveQueues();
+
+      // Show the first active queue on the Home screen.
+      setActiveQueue(queues[0] ?? null);
+    } catch (err) {
+      setActiveQueueError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load your active queue."
+      );
+    } finally {
+      setActiveQueueLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
+      setActiveQueueLoading(true);
+
       void loadServices();
-    }, [loadServices])
+      void loadActiveQueue();
+    }, [loadServices, loadActiveQueue])
   );
 
   useFocusEffect(
@@ -73,7 +100,11 @@ export default function Home() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadServices();
+    setActiveQueueLoading(true);
+
+    await Promise.all([loadServices(), loadActiveQueue()]);
+
+    setRefreshing(false);
   };
 
   const filteredServices = services.filter((service) =>
@@ -86,11 +117,15 @@ export default function Home() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+        />
       }
     >
       <View style={styles.header}>
         <Text style={styles.logoText}>SmartQueue</Text>
+
         <Pressable
           style={styles.profileButton}
           accessibilityRole="button"
@@ -101,7 +136,8 @@ export default function Home() {
         </Pressable>
       </View>
 
-      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
+      <Text style={styles.greeting}>Welcome to SmartQueue!</Text>
+
       <Text style={styles.title}>
         Find a service and skip the waiting line.
       </Text>
@@ -110,9 +146,13 @@ export default function Home() {
         <Pressable
           style={styles.adminButton}
           accessibilityRole="button"
-          onPress={() => router.push("/admin-dashboard")}
+          onPress={() => router.push("/admin-dashboard" as any)}
         >
-          <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+          <Ionicons
+            name="settings-outline"
+            size={22}
+            color="#FFFFFF"
+          />
           <Text style={styles.adminButtonText}>
             Open Admin Dashboard
           </Text>
@@ -127,13 +167,23 @@ export default function Home() {
       />
 
       <Text style={styles.sectionTitle}>My Active Queue</Text>
-      <ActiveQueueCard />
+
+      <ActiveQueueCard
+        queue={activeQueue}
+        loading={activeQueueLoading}
+        error={activeQueueError}
+      />
+
       <Text style={styles.sectionTitle}>Available Services</Text>
 
       {loading && <ActivityIndicator size="large" />}
+
       {error && <Text style={styles.errorText}>{error}</Text>}
+
       {!loading && !error && filteredServices.length === 0 && (
-        <Text style={styles.emptyText}>No available services found.</Text>
+        <Text style={styles.emptyText}>
+          No available services found.
+        </Text>
       )}
 
       {!loading &&
