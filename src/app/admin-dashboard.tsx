@@ -1,6 +1,7 @@
 
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
+import QRCode from "react-native-qrcode-svg";
 import {
   ActivityIndicator,
   Alert,
@@ -18,8 +19,15 @@ import {
   adminPauseQueue,
   adminResumeQueue,
   adminSkipCurrent,
+  adminCreateQueueCheckinCode,
+  adminListPendingEntries,
+  adminVerifyPendingEntry,
+  adminRejectPendingEntry,
+  adminMarkCurrentNoShow,
+  adminExpireNoShows,
   checkIsAdmin,
   getMyManagedQueues,
+  type AdminPendingEntry,
   type ManagedQueue,
 } from "../services/adminQueueService";
 
@@ -43,8 +51,22 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Run the server-side no-show timeout check using each queue's configured grace period.
+      const initialQueues = await getMyManagedQueues();
+      await Promise.all(
+        initialQueues.map((queue) => adminExpireNoShows(queue.queue_id))
+      );
+
       const result = await getMyManagedQueues();
-      setQueues(result);
+      const queuesWithPending = await Promise.all(
+        result.map(async (queue) => ({
+          ...queue,
+          pending_entries: await adminListPendingEntries(queue.queue_id),
+          checkin_code: null,
+          checkin_expires_at: null,
+        }))
+      );
+      setQueues(queuesWithPending);
     } catch (err) {
       setQueues([]);
       setError(
@@ -57,6 +79,151 @@ export default function AdminDashboard() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleCreateCheckinQr = async (queue: ManagedQueue) => {
+    if (busyQueueId !== null) return;
+    setBusyQueueId(queue.queue_id);
+
+    try {
+      const result = await adminCreateQueueCheckinCode(queue.queue_id);
+      setQueues((current) =>
+        current.map((item) =>
+          item.queue_id === queue.queue_id
+            ? {
+                ...item,
+                checkin_code: result.checkin_code,
+                checkin_expires_at: result.expires_at,
+              }
+            : item
+        )
+      );
+      Alert.alert(
+        "Check-in QR ready",
+        "Display this QR at the service location. It expires in 5 minutes; generating another QR revokes the previous one."
+      );
+    } catch (err) {
+      Alert.alert(
+        "Unable to create QR",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setBusyQueueId(null);
+    }
+  };
+
+  const handleVerifyArrivalManually = (
+    queue: ManagedQueue,
+    entry: AdminPendingEntry
+  ) => {
+    if (busyQueueId !== null) return;
+
+    Alert.alert(
+      "Verify arrival in person?",
+      "Confirm that " +
+        entry.customer_name +
+        " (token A" +
+        String(entry.token_number).padStart(3, "0") +
+        ") is physically present at " +
+        queue.service_name +
+        ".",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Verify Arrival",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              await adminVerifyPendingEntry(entry.entry_id);
+              await loadQueues();
+              Alert.alert("Arrival verified", "The token is now in the waiting queue.");
+            } catch (err) {
+              Alert.alert(
+                "Verification failed",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectPending = (
+    queue: ManagedQueue,
+    entry: AdminPendingEntry
+  ) => {
+    if (busyQueueId !== null) return;
+
+    Alert.alert(
+      "Reject token request?",
+      "Reject token A" +
+        String(entry.token_number).padStart(3, "0") +
+        "? It will remain in the customer's history as rejected.",
+      [
+        { text: "Keep Request", style: "cancel" },
+        {
+          text: "Reject Request",
+          style: "destructive",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              await adminRejectPendingEntry(entry.entry_id);
+              await loadQueues();
+              Alert.alert("Request rejected", "The pending request was rejected.");
+            } catch (err) {
+              Alert.alert(
+                "Reject failed",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMarkCurrentNoShow = (queue: ManagedQueue) => {
+    if (busyQueueId !== null || queue.called_token === null) return;
+
+    Alert.alert(
+      "Mark current token as no-show?",
+      "Mark token A" +
+        String(queue.called_token).padStart(3, "0") +
+        " as a no-show? This removes it from the active queue.",
+      [
+        { text: "Keep Token", style: "cancel" },
+        {
+          text: "Mark No-show",
+          style: "destructive",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              const token = await adminMarkCurrentNoShow(queue.queue_id);
+              await loadQueues();
+              Alert.alert(
+                "Marked as no-show",
+                "Token A" + String(token).padStart(3, "0") + " was removed from the active queue."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Unable to mark no-show",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
