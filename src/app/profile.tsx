@@ -1,4 +1,3 @@
-
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -295,12 +294,8 @@ export default function Profile() {
       <Pressable
         style={styles.option}
         accessibilityRole="button"
-        onPress={() =>
-          Alert.alert(
-            "Account Settings",
-            "Account settings will be available in a future update."
-          )
-        }
+        accessibilityLabel="Open account settings"
+        onPress={() => router.push("/account-settings" as any)}
       >
         <Text style={styles.optionText}>Account Settings</Text>
         <Text style={styles.optionArrow}>›</Text>
