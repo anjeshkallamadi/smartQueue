@@ -330,7 +330,7 @@ export interface MyQueueHistoryEntry {
   id: string;
   queueId: string;
   serviceName: string;
-  tokenNumber: number;
+  tokenNumber: number | null;
   status: string;
   joinedAt: string;
   servedAt: string | null;
