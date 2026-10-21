@@ -60,7 +60,7 @@ export async function getMyActiveQueueEntry(queueId: string): Promise<{
     .select("id, queue_id, token_number, status, joined_at")
     .eq("queue_id", queueId)
     .eq("user_id", userData.user.id)
-    .in("status", ["waiting", "called"])
+    .in("status", ["pending_verification", "waiting", "called"])
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -419,3 +419,49 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
 }
 
 
+
+
+export interface VerifiedQueueEntry extends SecureQueueEntry {}
+
+/** Activate the signed-in user's pending queue request using an on-site QR code. */
+export async function verifySupabaseQueueArrival(
+  queueId: string,
+  code: string
+): Promise<VerifiedQueueEntry> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in before verifying your arrival.");
+  }
+
+  const { data, error } = await supabase.rpc("verify_queue_arrival", {
+    p_queue_id: queueId,
+    p_code: code,
+  });
+
+  if (error) throw new Error(error.message);
+
+  const entry = (data as VerifiedQueueEntry[] | null)?.[0];
+  if (!entry) {
+    throw new Error("The server did not return a verified queue entry.");
+  }
+
+  return entry;
+}
+
+/** Cancel the signed-in user's own pending or active entry through the secure RPC. */
+export async function cancelMyQueueEntry(queueId: string): Promise<void> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in before cancelling a queue entry.");
+  }
+
+  const { error } = await supabase.rpc("cancel_my_queue_entry", {
+    p_queue_id: queueId,
+  });
+
+  if (error) throw new Error(error.message);
+}
