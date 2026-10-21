@@ -239,7 +239,9 @@ export default function Profile() {
               <View style={styles.queueInfoRow}>
                 <Text style={styles.queueInfoLabel}>Status</Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.status}
+                  {queue.status === "pending_verification"
+                    ? "Pending arrival verification"
+                    : queue.status}
                 </Text>
               </View>
             </View>
