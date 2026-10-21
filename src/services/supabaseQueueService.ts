@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 export interface SecureQueueEntry {
   entry_id: string;
   queue_id: string;
-  token_number: number;
+  token_number: number | null;
   entry_status: string;
   people_ahead: number;
 }
@@ -46,7 +46,7 @@ export async function joinSupabaseQueue(queueId: string): Promise<SecureQueueEnt
 export async function getMyActiveQueueEntry(queueId: string): Promise<{
   id: string;
   queue_id: string;
-  token_number: number;
+  token_number: number | null;
   status: string;
   joined_at: string;
 } | null> {
