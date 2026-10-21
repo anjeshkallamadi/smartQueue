@@ -506,7 +506,8 @@ export default function AdminDashboard() {
           const isActive = queue.queue_status === "active";
           const isPaused = queue.queue_status === "paused";
 
-          const canCallNext = isActive && !isBusy;
+          const canCallNext =
+            isActive && queue.called_token === null && !isBusy;
 
           const canSkip =
             isActive &&
@@ -701,7 +702,9 @@ export default function AdminDashboard() {
                   <Text style={styles.buttonText}>
                     {busyQueueId === queue.queue_id
                       ? "Processing..."
-                      : "Call Next"}
+                      : queue.called_token !== null
+                        ? "Mark Current First"
+                        : "Call Next"}
                   </Text>
                 </Pressable>
 
