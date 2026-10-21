@@ -1,8 +1,9 @@
 
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,6 +21,7 @@ import {
   getNowServingToken,
   getSupabaseQueue,
   joinSupabaseQueue,
+  cancelMyQueueEntry,
 } from "../services/supabaseQueueService";
 
 type MyEntry = {
@@ -49,6 +51,7 @@ export default function QueueDetails() {
 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -84,7 +87,7 @@ export default function QueueDetails() {
       setEntry(myEntry);
       setPeopleAhead(null);
 
-      if (myEntry) {
+      if (myEntry && myEntry.status !== "pending_verification") {
         try {
           const position = await getMyQueuePosition(queueId);
 
@@ -197,7 +200,9 @@ export default function QueueDetails() {
       });
 
       setPeopleAhead(result.people_ahead);
-      setMessage("Successfully joined the queue!");
+      setMessage(
+        "Token request created. Scan the current QR code at the service location to activate your place in the queue."
+      );
 
       // Synchronize after joining.
       await loadDetails();
@@ -212,6 +217,40 @@ export default function QueueDetails() {
       setJoining(false);
     }
   };
+
+  async function cancelCurrentEntry() {
+    if (!queueId || cancelling) return;
+
+    Alert.alert(
+      "Cancel queue token?",
+      "Your pending request or active queue place will be cancelled. You will need to join again to get another token.",
+      [
+        { text: "Keep Token", style: "cancel" },
+        {
+          text: "Cancel Token",
+          style: "destructive",
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              await cancelMyQueueEntry(queueId);
+              setEntry(null);
+              setPeopleAhead(null);
+              setMessage("Your queue entry has been cancelled.");
+              await loadDetails();
+            } catch (error) {
+              setMessage(
+                error instanceof Error
+                  ? error.message
+                  : "Unable to cancel your queue entry."
+              );
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
+    );
+  }
 
   const estimatedWait =
     peopleAhead !== null &&
@@ -315,12 +354,53 @@ export default function QueueDetails() {
             : joining
               ? "Joining..."
               : entry
-                ? "Already Joined"
+                ? entry.status === "pending_verification"
+                  ? "Verification Required"
+                  : "Already Joined"
                 : queueStatus !== "active"
                   ? "Queue Unavailable"
                   : "Join Queue"}
         </Text>
       </Pressable>
+
+      {entry?.status === "pending_verification" && (
+        <View style={styles.infoCard}>
+          <Text style={styles.sectionTitle}>Verify your arrival</Text>
+          <Text style={styles.description}>
+            Your token request does not occupy a waiting place yet. Be at the service location, scan its current SmartQueue QR code, or ask staff to verify your arrival.
+          </Text>
+          <Pressable
+            style={styles.joinButton}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/verify-arrival",
+                params: {
+                  queueId,
+                  serviceName: Array.isArray(serviceName)
+                    ? serviceName[0]
+                    : serviceName ?? "Service",
+                },
+              } as any)
+            }
+          >
+            <Text style={styles.joinButtonText}>Scan Arrival QR Code</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {entry && ["pending_verification", "waiting", "called"].includes(entry.status) && (
+        <Pressable
+          style={[styles.joinButton, cancelling && styles.joinButtonDisabled]}
+          disabled={cancelling}
+          accessibilityRole="button"
+          onPress={cancelCurrentEntry}
+        >
+          <Text style={styles.joinButtonText}>
+            {cancelling ? "Cancelling..." : "Cancel Queue Token"}
+          </Text>
+        </Pressable>
+      )}
 
       {message && (
         <Text
@@ -340,6 +420,12 @@ export default function QueueDetails() {
           <Text style={styles.token}>
             {formatQueueToken(entry.token_number)}
           </Text>
+
+          {entry.status === "pending_verification" && (
+            <Text style={styles.message}>
+              Pending arrival verification. This token is not counted in the waiting line until your arrival is confirmed.
+            </Text>
+          )}
 
           <View style={styles.resultRow}>
             <Text style={styles.resultLabel}>
