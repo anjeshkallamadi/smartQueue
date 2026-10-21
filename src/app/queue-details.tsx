@@ -27,7 +27,7 @@ import {
 type MyEntry = {
   id: string;
   queue_id: string;
-  token_number: number;
+  token_number: number | null;
   status: string;
   joined_at: string;
 };
@@ -418,7 +418,9 @@ export default function QueueDetails() {
           </Text>
 
           <Text style={styles.token}>
-            {formatQueueToken(entry.token_number)}
+            {entry.token_number === null
+              ? "Pending"
+              : formatQueueToken(entry.token_number)}
           </Text>
 
           {entry.status === "pending_verification" && (
