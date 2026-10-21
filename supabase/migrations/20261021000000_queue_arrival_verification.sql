@@ -29,6 +29,24 @@ BEGIN
 END;
 $constraint$;
 
+-- Each queue operates in virtual reservation or on-site-only mode.
+ALTER TABLE public.queues
+  ADD COLUMN IF NOT EXISTS queue_mode text NOT NULL DEFAULT 'virtual';
+
+DO $constraint$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'queues_queue_mode_allowed'
+      AND conrelid = 'public.queues'::regclass
+  ) THEN
+    ALTER TABLE public.queues
+      ADD CONSTRAINT queues_queue_mode_allowed
+      CHECK (queue_mode IN ('virtual', 'on_site'));
+  END IF;
+END;
+$constraint$;
+
 -- Pending verification requests must also prevent duplicate queue requests.
 DROP INDEX IF EXISTS public.unique_active_queue_user;
 CREATE UNIQUE INDEX unique_active_queue_user
@@ -76,6 +94,7 @@ AS $function$
 DECLARE
   v_user_id uuid;
   v_queue_status text;
+  v_queue_mode text;
   v_entry_id uuid;
   v_token integer;
   v_status text;
@@ -88,7 +107,8 @@ BEGIN
     RAISE EXCEPTION 'Queue ID is required';
   END IF;
 
-  SELECT q.status INTO v_queue_status
+  SELECT q.status, q.queue_mode
+    INTO v_queue_status, v_queue_mode
   FROM public.queues q
   WHERE q.id = p_queue_id
   FOR UPDATE;
@@ -111,8 +131,11 @@ BEGIN
       RAISE EXCEPTION 'Queue is not active';
     END IF;
 
-    -- Do not allocate a token until arrival is verified. This prevents pending
-    -- requests from reserving queue order or jumping ahead of checked-in users.
+    IF v_queue_mode = 'on_site' THEN
+      RAISE EXCEPTION 'This service requires on-site QR check-in. Scan the current service QR code to join.';
+    END IF;
+
+    -- A virtual request does not receive a token until arrival is verified.
     INSERT INTO public.queue_entries (
       queue_id, user_id, token_number, status
     ) VALUES (
@@ -203,6 +226,7 @@ AS $function$
 DECLARE
   v_user_id uuid;
   v_queue_status text;
+  v_queue_mode text;
   v_entry_id uuid;
   v_token integer;
   v_status text;
@@ -216,7 +240,8 @@ BEGIN
   END IF;
 
   -- Serialize token assignment with other arrivals and staff queue actions.
-  SELECT q.status INTO v_queue_status
+  SELECT q.status, q.queue_mode
+    INTO v_queue_status, v_queue_mode
   FROM public.queues q
   WHERE q.id = p_queue_id
   FOR UPDATE;
@@ -247,10 +272,30 @@ BEGIN
   FOR UPDATE;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'No pending queue request found for your account';
-  END IF;
+    IF v_queue_mode IS DISTINCT FROM 'on_site' THEN
+      RAISE EXCEPTION 'No pending queue request found for your account. Request a virtual token first.';
+    END IF;
 
-  IF v_status = 'pending_verification' THEN
+    -- On-site-only mode: scanning the location QR is the join action.
+    UPDATE public.queues q
+    SET current_token = GREATEST(
+      COALESCE(q.current_token, 0),
+      COALESCE((
+        SELECT MAX(qe.token_number)
+        FROM public.queue_entries qe
+        WHERE qe.queue_id = p_queue_id
+      ), 0)
+    ) + 1
+    WHERE q.id = p_queue_id
+    RETURNING q.current_token INTO v_token;
+
+    INSERT INTO public.queue_entries (
+      queue_id, user_id, token_number, status, arrival_verified_at
+    ) VALUES (
+      p_queue_id, v_user_id, v_token, 'waiting', now()
+    )
+    RETURNING id, status INTO v_entry_id, v_status;
+  ELSIF v_status = 'pending_verification' THEN
     UPDATE public.queues q
     SET current_token = GREATEST(
       COALESCE(q.current_token, 0),
@@ -681,6 +726,52 @@ BEGIN
 END;
 $function$;
 
+-- Owners choose whether to allow remote pending requests or require on-site QR joins.
+CREATE OR REPLACE FUNCTION public.admin_get_queue_mode(p_queue_id uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_mode text;
+BEGIN
+  IF NOT public.can_manage_queue(p_queue_id) THEN
+    RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+  SELECT q.queue_mode INTO v_mode
+  FROM public.queues q
+  WHERE q.id = p_queue_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Queue not found';
+  END IF;
+  RETURN v_mode;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.admin_set_queue_mode(
+  p_queue_id uuid,
+  p_mode text
+)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF p_mode IS NULL OR p_mode NOT IN ('virtual', 'on_site') THEN
+    RAISE EXCEPTION 'Queue mode must be virtual or on_site';
+  END IF;
+  IF NOT public.can_manage_queue(p_queue_id) THEN
+    RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+  UPDATE public.queues
+  SET queue_mode = p_mode
+  WHERE id = p_queue_id;
+  RETURN p_mode;
+END;
+$function$;
+
 -- Service owners can adjust their own queue's no-show grace period (1-30 minutes).
 CREATE OR REPLACE FUNCTION public.admin_get_no_show_grace(p_queue_id uuid)
  RETURNS integer
@@ -747,6 +838,8 @@ REVOKE ALL ON FUNCTION public.admin_mark_current_no_show(uuid) FROM PUBLIC, anon
 REVOKE ALL ON FUNCTION public.admin_expire_no_shows(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_get_no_show_grace(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_set_no_show_grace(uuid, integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.admin_get_queue_mode(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.admin_set_queue_mode(uuid, text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.join_queue_secure(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_call_next(uuid) TO authenticated, service_role;
@@ -761,5 +854,7 @@ GRANT EXECUTE ON FUNCTION public.admin_mark_current_no_show(uuid) TO authenticat
 GRANT EXECUTE ON FUNCTION public.admin_expire_no_shows(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_get_no_show_grace(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_set_no_show_grace(uuid, integer) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_get_queue_mode(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_set_queue_mode(uuid, text) TO authenticated, service_role;
 
 COMMIT;
