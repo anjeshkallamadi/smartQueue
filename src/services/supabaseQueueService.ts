@@ -361,7 +361,11 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
   // Do not show entries that are still active.
   const historyEntries = (entries ?? []).filter((entry) => {
     const status = String(entry.status ?? "").toLowerCase();
-    return status !== "waiting" && status !== "called";
+    return (
+      status !== "pending_verification" &&
+      status !== "waiting" &&
+      status !== "called"
+    );
   });
 
   if (historyEntries.length === 0) {
