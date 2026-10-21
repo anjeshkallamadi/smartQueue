@@ -1,12 +1,22 @@
 
 import { supabase } from "../lib/supabase";
 
+export interface AdminPendingEntry {
+  entry_id: string;
+  token_number: number;
+  customer_name: string;
+  joined_at: string;
+}
+
 export interface ManagedQueue {
   queue_id: string;
   service_name: string;
   queue_status: string;
   waiting_count: number;
   called_token: number | null;
+  pending_entries?: AdminPendingEntry[];
+  checkin_code?: string | null;
+  checkin_expires_at?: string | null;
 }
 
 export interface AdminCalledEntry {
@@ -108,3 +118,70 @@ export async function adminResumeQueue(
 }
 
 
+
+
+export interface QueueCheckinCode {
+  checkin_code: string;
+  expires_at: string;
+}
+
+export async function adminCreateQueueCheckinCode(
+  queueId: string
+): Promise<QueueCheckinCode> {
+  const { data, error } = await supabase.rpc(
+    "admin_create_queue_checkin_code",
+    { p_queue_id: queueId }
+  );
+  if (error) throw new Error(error.message);
+
+  const code = (data as QueueCheckinCode[] | null)?.[0];
+  if (!code) throw new Error("The server did not return a check-in code.");
+  return code;
+}
+
+export async function adminListPendingEntries(
+  queueId: string
+): Promise<AdminPendingEntry[]> {
+  const { data, error } = await supabase.rpc(
+    "admin_list_pending_entries",
+    { p_queue_id: queueId }
+  );
+  if (error) throw new Error(error.message);
+  return (data ?? []) as AdminPendingEntry[];
+}
+
+export async function adminVerifyPendingEntry(entryId: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_verify_pending_entry", {
+    p_entry_id: entryId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function adminRejectPendingEntry(entryId: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_reject_pending_entry", {
+    p_entry_id: entryId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function adminMarkCurrentNoShow(
+  queueId: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc(
+    "admin_mark_current_no_show",
+    { p_queue_id: queueId }
+  );
+  if (error) throw new Error(error.message);
+  if (typeof data !== "number") {
+    throw new Error("No currently called token was returned.");
+  }
+  return data;
+}
+
+export async function adminExpireNoShows(queueId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_expire_no_shows", {
+    p_queue_id: queueId,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}
