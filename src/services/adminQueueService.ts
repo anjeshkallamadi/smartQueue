@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 
 export interface AdminPendingEntry {
   entry_id: string;
-  token_number: number;
+  token_number: number | null;
   customer_name: string;
   joined_at: string;
 }
