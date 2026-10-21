@@ -371,9 +371,9 @@ export default function AdminDashboard() {
 
     Alert.alert(
       "Call Next Token",
-      "Call the next waiting token for " +
+      "Call the next verified waiting token for " +
         queue.service_name +
-        "? If a token is currently called, mark it Served or No-show first. Overdue calls are marked no-show automatically.",
+        "? Pending arrival-verification requests are not included in the waiting line.",
       [
         { text: "Cancel", style: "cancel" },
         {
