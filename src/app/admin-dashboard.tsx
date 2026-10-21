@@ -25,6 +25,8 @@ import {
   adminRejectPendingEntry,
   adminMarkCurrentNoShow,
   adminExpireNoShows,
+  adminGetNoShowGrace,
+  adminSetNoShowGrace,
   checkIsAdmin,
   getMyManagedQueues,
   type AdminPendingEntry,
@@ -59,12 +61,20 @@ export default function AdminDashboard() {
 
       const result = await getMyManagedQueues();
       const queuesWithPending = await Promise.all(
-        result.map(async (queue) => ({
-          ...queue,
-          pending_entries: await adminListPendingEntries(queue.queue_id),
-          checkin_code: null,
-          checkin_expires_at: null,
-        }))
+        result.map(async (queue) => {
+          const [pendingEntries, graceMinutes] = await Promise.all([
+            adminListPendingEntries(queue.queue_id),
+            adminGetNoShowGrace(queue.queue_id),
+          ]);
+
+          return {
+            ...queue,
+            pending_entries: pendingEntries,
+            checkin_code: null,
+            checkin_expires_at: null,
+            no_show_grace_minutes: graceMinutes,
+          };
+        })
       );
       setQueues(queuesWithPending);
     } catch (err) {
@@ -79,6 +89,33 @@ export default function AdminDashboard() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleSetNoShowGrace = async (
+    queue: ManagedQueue,
+    minutes: number
+  ) => {
+    if (busyQueueId !== null) return;
+    if (minutes < 1 || minutes > 30) return;
+
+    setBusyQueueId(queue.queue_id);
+    try {
+      const savedMinutes = await adminSetNoShowGrace(queue.queue_id, minutes);
+      setQueues((current) =>
+        current.map((item) =>
+          item.queue_id === queue.queue_id
+            ? { ...item, no_show_grace_minutes: savedMinutes }
+            : item
+        )
+      );
+    } catch (err) {
+      Alert.alert(
+        "Unable to update grace period",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setBusyQueueId(null);
+    }
+  };
 
   const handleCreateCheckinQr = async (queue: ManagedQueue) => {
     if (busyQueueId !== null) return;
@@ -243,7 +280,9 @@ export default function AdminDashboard() {
 
     Alert.alert(
       "Call Next Token",
-      `Call the next waiting token for ${queue.service_name}? The currently called token, if any, will be marked completed.`,
+      "Call the next waiting token for " +
+        queue.service_name +
+        "? The current token is marked completed, or no-show if its configured grace period has elapsed.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -466,6 +505,47 @@ export default function AdminDashboard() {
               <Text style={styles.detail}>
                 Pending Verification: {queue.pending_entries?.length ?? 0}
               </Text>
+
+              <View style={{ marginTop: 6, marginBottom: 8 }}>
+                <Text style={styles.detail}>
+                  No-show grace period: {queue.no_show_grace_minutes ?? 3} minute(s)
+                </Text>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.button,
+                      styles.skipButton,
+                      (busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) <= 1) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) <= 1}
+                    onPress={() => void handleSetNoShowGrace(
+                      queue,
+                      (queue.no_show_grace_minutes ?? 3) - 1
+                    )}
+                  >
+                    <Text style={styles.buttonText}>− 1 minute</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.button,
+                      styles.callButton,
+                      (busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) >= 30) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) >= 30}
+                    onPress={() => void handleSetNoShowGrace(
+                      queue,
+                      (queue.no_show_grace_minutes ?? 3) + 1
+                    )}
+                  >
+                    <Text style={styles.buttonText}>+ 1 minute</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.helperText}>
+                  Range: 1–30 minutes. Expired calls are marked no-show when the dashboard refreshes or the next token is called.
+                </Text>
+              </View>
 
               <Pressable
                 accessibilityRole="button"
