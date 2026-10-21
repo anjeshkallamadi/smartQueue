@@ -187,9 +187,9 @@ export async function getNowServingToken(
 export interface MyActiveQueue {
   queueId: string;
   serviceName: string;
-  tokenNumber: number;
+  tokenNumber: number | null;
   status: string;
-  peopleAhead: number;
+  peopleAhead: number | null;
   estimatedWaitMinutes: number | null;
 }
 
@@ -208,7 +208,7 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
     .from("queue_entries")
     .select("queue_id, token_number, status")
     .eq("user_id", userData.user.id)
-    .in("status", ["waiting", "called"]);
+    .in("status", ["pending_verification", "waiting", "called"]);
 
   if (entriesError) {
     throw new Error(entriesError.message);
@@ -282,6 +282,22 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
       ? serviceMap.get(queue.service_id)
       : undefined;
 
+    const averageMinutes = queue.average_service_time;
+
+    // Pending requests appear on the Home screen but never count toward
+    // waiting totals or estimated wait until arrival is verified.
+    if (entry.status === "pending_verification") {
+      activeQueues.push({
+        queueId: entry.queue_id,
+        serviceName: service?.name ?? "Service",
+        tokenNumber: null,
+        status: entry.status,
+        peopleAhead: null,
+        estimatedWaitMinutes: null,
+      });
+      continue;
+    }
+
     let peopleAhead = 0;
 
     const { data: positionData, error: positionError } =
@@ -292,8 +308,6 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
     if (!positionError && positionData?.length) {
       peopleAhead = Number(positionData[0].people_ahead);
     }
-
-    const averageMinutes = queue.average_service_time;
 
     activeQueues.push({
       queueId: entry.queue_id,
