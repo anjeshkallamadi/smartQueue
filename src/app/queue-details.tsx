@@ -42,6 +42,7 @@ export default function QueueDetails() {
 
   const [entry, setEntry] = useState<MyEntry | null>(null);
   const [queueStatus, setQueueStatus] = useState("");
+  const [queueMode, setQueueMode] = useState<"virtual" | "on_site">("virtual");
   const [averageMinutes, setAverageMinutes] =
     useState<number | null>(null);
   const [peopleAhead, setPeopleAhead] =
@@ -82,6 +83,7 @@ export default function QueueDetails() {
         ]);
 
       setQueueStatus(queue.status);
+      setQueueMode(queue.queue_mode === "on_site" ? "on_site" : "virtual");
       setAverageMinutes(queue.average_service_time);
       setNowServing(currentServing);
       setEntry(myEntry);
@@ -252,6 +254,20 @@ export default function QueueDetails() {
     );
   }
 
+  const handleOpenArrivalScanner = () => {
+    if (!queueId) return;
+
+    router.push({
+      pathname: "/verify-arrival",
+      params: {
+        queueId,
+        serviceName: Array.isArray(serviceName)
+          ? serviceName[0]
+          : serviceName ?? "Service",
+      },
+    } as any);
+  };
+
   const estimatedWait =
     peopleAhead !== null &&
     averageMinutes !== null &&
@@ -281,8 +297,12 @@ export default function QueueDetails() {
       </Text>
 
       <Text style={styles.description}>
-        {description ??
-          "View queue information and join remotely."}
+        {description ?? "View queue information and join the service queue."}
+      </Text>
+      <Text style={styles.description}>
+        {queueMode === "on_site"
+          ? "Mode: On-site Only. Scan the service QR code at the location to receive a token."
+          : "Mode: Virtual Queue. Request a token remotely, then verify your arrival at the service before entering the waiting line."}
       </Text>
 
       <Text style={styles.sectionTitle}>
@@ -343,7 +363,7 @@ export default function QueueDetails() {
           buttonDisabled &&
             styles.joinButtonDisabled,
         ]}
-        onPress={handleJoin}
+        onPress={queueMode === "on_site" ? handleOpenArrivalScanner : handleJoin}
         disabled={buttonDisabled}
         accessibilityRole="button"
         accessibilityLabel="Join selected queue"
@@ -359,7 +379,9 @@ export default function QueueDetails() {
                   : "Already Joined"
                 : queueStatus !== "active"
                   ? "Queue Unavailable"
-                  : "Join Queue"}
+                  : queueMode === "on_site"
+                    ? "Scan QR to Join"
+                    : "Join Queue"}
         </Text>
       </Pressable>
 
@@ -372,17 +394,7 @@ export default function QueueDetails() {
           <Pressable
             style={styles.joinButton}
             accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: "/verify-arrival",
-                params: {
-                  queueId,
-                  serviceName: Array.isArray(serviceName)
-                    ? serviceName[0]
-                    : serviceName ?? "Service",
-                },
-              } as any)
-            }
+            onPress={handleOpenArrivalScanner}
           >
             <Text style={styles.joinButtonText}>Scan Arrival QR Code</Text>
           </Pressable>
