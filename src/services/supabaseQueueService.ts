@@ -13,6 +13,7 @@ export interface QueueRecord {
   id: string;
   service_id: string;
   status: string;
+  queue_mode: "virtual" | "on_site" | string;
   current_token: number | null;
   average_service_time: number | null;
 }
@@ -71,7 +72,7 @@ export async function getMyActiveQueueEntry(queueId: string): Promise<{
 export async function getSupabaseQueue(queueId: string): Promise<QueueRecord> {
   const { data, error } = await supabase
     .from("queues")
-    .select("id, service_id, status, current_token, average_service_time")
+    .select("id, service_id, status, queue_mode, current_token, average_service_time")
     .eq("id", queueId)
     .single();
 
