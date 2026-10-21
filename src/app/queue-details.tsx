@@ -459,7 +459,9 @@ export default function QueueDetails() {
             </Text>
 
             <Text style={styles.resultValue}>
-              {entry.status}
+              {entry.status === "pending_verification"
+                ? "Pending arrival verification"
+                : entry.status.replace(/_/g, " ")}
             </Text>
           </View>
 
