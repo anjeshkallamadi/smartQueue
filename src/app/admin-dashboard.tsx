@@ -28,6 +28,8 @@ import {
   adminExpireNoShows,
   adminGetNoShowGrace,
   adminSetNoShowGrace,
+  adminGetQueueMode,
+  adminSetQueueMode,
   checkIsAdmin,
   getMyManagedQueues,
   type AdminPendingEntry,
@@ -63,9 +65,10 @@ export default function AdminDashboard() {
       const result = await getMyManagedQueues();
       const queuesWithPending = await Promise.all(
         result.map(async (queue) => {
-          const [pendingEntries, graceMinutes] = await Promise.all([
+          const [pendingEntries, graceMinutes, queueMode] = await Promise.all([
             adminListPendingEntries(queue.queue_id),
             adminGetNoShowGrace(queue.queue_id),
+            adminGetQueueMode(queue.queue_id),
           ]);
 
           return {
@@ -74,6 +77,7 @@ export default function AdminDashboard() {
             checkin_code: null,
             checkin_expires_at: null,
             no_show_grace_minutes: graceMinutes,
+            queue_mode: queueMode,
           };
         })
       );
@@ -90,6 +94,56 @@ export default function AdminDashboard() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleToggleQueueMode = (queue: ManagedQueue) => {
+    if (busyQueueId !== null) return;
+
+    const currentMode = queue.queue_mode ?? "virtual";
+    const nextMode = currentMode === "on_site" ? "virtual" : "on_site";
+
+    Alert.alert(
+      "Change queue mode?",
+      nextMode === "on_site"
+        ? "Switch to On-site Only? New customers must scan the current service QR before a numbered token is issued. Existing active and pending entries are preserved."
+        : "Switch to Virtual Queue? Customers can request a pending token remotely, but must still verify arrival before entering the active waiting line.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Switch Mode",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              const savedMode = await adminSetQueueMode(
+                queue.queue_id,
+                nextMode
+              );
+              setQueues((current) =>
+                current.map((item) =>
+                  item.queue_id === queue.queue_id
+                    ? { ...item, queue_mode: savedMode }
+                    : item
+                )
+              );
+              Alert.alert(
+                "Queue mode updated",
+                "This queue now uses " +
+                  (savedMode === "on_site" ? "On-site Only" : "Virtual Queue") +
+                  "."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Unable to change queue mode",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSetNoShowGrace = async (
     queue: ManagedQueue,
@@ -526,6 +580,29 @@ export default function AdminDashboard() {
               <Text style={styles.detail}>
                 Queue Status: {queue.queue_status}
               </Text>
+              <Text style={styles.detail}>
+                Queue Mode: {queue.queue_mode === "on_site" ? "On-site Only" : "Virtual Queue"}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.toggleButton,
+                  queue.queue_mode === "on_site"
+                    ? styles.resumeButton
+                    : styles.callButton,
+                  busyQueueId !== null && styles.disabled,
+                ]}
+                disabled={busyQueueId !== null}
+                onPress={() => handleToggleQueueMode(queue)}
+              >
+                <Text style={styles.buttonText}>
+                  {busyQueueId === queue.queue_id
+                    ? "Processing..."
+                    : queue.queue_mode === "on_site"
+                      ? "Switch to Virtual Queue"
+                      : "Switch to On-site Only"}
+                </Text>
+              </Pressable>
 
               <Text style={styles.detail}>
                 Now Serving:{" "}
