@@ -24,6 +24,7 @@ import {
   adminVerifyPendingEntry,
   adminRejectPendingEntry,
   adminMarkCurrentNoShow,
+  adminCompleteCurrent,
   adminExpireNoShows,
   adminGetNoShowGrace,
   adminSetNoShowGrace,
@@ -226,6 +227,42 @@ export default function AdminDashboard() {
     );
   };
 
+  const handleMarkCurrentServed = (queue: ManagedQueue) => {
+    if (busyQueueId !== null || queue.called_token === null) return;
+
+    Alert.alert(
+      "Mark current token as served?",
+      "Confirm that token A" +
+        String(queue.called_token).padStart(3, "0") +
+        " has been served. It will be removed from the active queue.",
+      [
+        { text: "Keep Token", style: "cancel" },
+        {
+          text: "Mark Served",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              const token = await adminCompleteCurrent(queue.queue_id);
+              await loadQueues();
+              Alert.alert(
+                "Token completed",
+                "Token A" + String(token).padStart(3, "0") + " was marked served."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Unable to mark served",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleMarkCurrentNoShow = (queue: ManagedQueue) => {
     if (busyQueueId !== null || queue.called_token === null) return;
 
@@ -282,7 +319,7 @@ export default function AdminDashboard() {
       "Call Next Token",
       "Call the next waiting token for " +
         queue.service_name +
-        "? The current token is marked completed, or no-show if its configured grace period has elapsed.",
+        "? If a token is currently called, mark it Served or No-show first. Overdue calls are marked no-show automatically.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -687,18 +724,32 @@ export default function AdminDashboard() {
               </View>
 
               {queue.called_token !== null && (
-                <Pressable
-                  accessibilityRole="button"
-                  style={[
-                    styles.toggleButton,
-                    styles.skipButton,
-                    (busyQueueId !== null || !isActive) && styles.disabled,
-                  ]}
-                  disabled={busyQueueId !== null || !isActive}
-                  onPress={() => handleMarkCurrentNoShow(queue)}
-                >
-                  <Text style={styles.buttonText}>Mark Current as No-show</Text>
-                </Pressable>
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.toggleButton,
+                      styles.callButton,
+                      (busyQueueId !== null || !isActive) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || !isActive}
+                    onPress={() => handleMarkCurrentServed(queue)}
+                  >
+                    <Text style={styles.buttonText}>Mark Current as Served</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.toggleButton,
+                      styles.skipButton,
+                      (busyQueueId !== null || !isActive) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || !isActive}
+                    onPress={() => handleMarkCurrentNoShow(queue)}
+                  >
+                    <Text style={styles.buttonText}>Mark Current as No-show</Text>
+                  </Pressable>
+                </>
               )}
 
               <Pressable
