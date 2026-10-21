@@ -165,6 +165,19 @@ export async function adminRejectPendingEntry(entryId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function adminCompleteCurrent(
+  queueId: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_complete_current", {
+    p_queue_id: queueId,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "number") {
+    throw new Error("No completed token number was returned.");
+  }
+  return data;
+}
+
 export async function adminMarkCurrentNoShow(
   queueId: string
 ): Promise<number> {
