@@ -121,9 +121,10 @@ export default function AdminDashboard() {
       "Verify arrival in person?",
       "Confirm that " +
         entry.customer_name +
-        " (token A" +
-        String(entry.token_number).padStart(3, "0") +
-        ") is physically present at " +
+        (entry.token_number === null
+          ? " (token not assigned yet)"
+          : " (token A" + String(entry.token_number).padStart(3, "0") + ")") +
+        " is physically present at " +
         queue.service_name +
         ".",
       [
@@ -159,8 +160,8 @@ export default function AdminDashboard() {
 
     Alert.alert(
       "Reject token request?",
-      "Reject token A" +
-        String(entry.token_number).padStart(3, "0") +
+      "Reject the pending request from " +
+        entry.customer_name +
         "? It will remain in the customer's history as rejected.",
       [
         { text: "Keep Request", style: "cancel" },
@@ -531,7 +532,9 @@ export default function AdminDashboard() {
                         {entry.customer_name}
                       </Text>
                       <Text style={styles.detail}>
-                        Token: A{String(entry.token_number).padStart(3, "0")}
+                        {entry.token_number === null
+                          ? "Token assigned after verification"
+                          : "Token: A" + String(entry.token_number).padStart(3, "0")}
                       </Text>
                       <Text style={styles.helperText}>
                         Requested: {new Date(entry.joined_at).toLocaleString()}
