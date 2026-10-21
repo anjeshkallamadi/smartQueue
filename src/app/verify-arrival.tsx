@@ -77,13 +77,18 @@ export default function VerifyArrivalScreen() {
         payload.code
       );
 
+      const tokenMessage =
+        verified.token_number === null
+          ? "Your arrival was verified. Status: " + verified.entry_status + "."
+          : "Token A" +
+            String(verified.token_number).padStart(3, "0") +
+            " is now " +
+            verified.entry_status +
+            ".";
+
       Alert.alert(
         "Arrival verified",
-        "Token A" +
-          String(verified.token_number).padStart(3, "0") +
-          " is now " +
-          verified.entry_status +
-          ". You can return to your queue details.",
+        tokenMessage + " You can return to your queue details.",
         [
           {
             text: "Continue",
