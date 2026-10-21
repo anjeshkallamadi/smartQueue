@@ -18,6 +18,7 @@ export interface ManagedQueue {
   checkin_code?: string | null;
   checkin_expires_at?: string | null;
   no_show_grace_minutes?: number;
+  queue_mode?: "virtual" | "on_site";
 }
 
 export interface AdminCalledEntry {
@@ -225,4 +226,30 @@ export async function adminSetNoShowGrace(
   });
   if (error) throw new Error(error.message);
   return Number(data);
+}
+
+
+export async function adminGetQueueMode(
+  queueId: string
+): Promise<"virtual" | "on_site"> {
+  const { data, error } = await supabase.rpc("admin_get_queue_mode", {
+    p_queue_id: queueId,
+  });
+  if (error) throw new Error(error.message);
+  return data === "on_site" ? "on_site" : "virtual";
+}
+
+export async function adminSetQueueMode(
+  queueId: string,
+  mode: "virtual" | "on_site"
+): Promise<"virtual" | "on_site"> {
+  const { data, error } = await supabase.rpc("admin_set_queue_mode", {
+    p_queue_id: queueId,
+    p_mode: mode,
+  });
+  if (error) throw new Error(error.message);
+  if (data !== "virtual" && data !== "on_site") {
+    throw new Error("The server returned an invalid queue mode.");
+  }
+  return data;
 }
