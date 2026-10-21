@@ -17,6 +17,7 @@ export interface ManagedQueue {
   pending_entries?: AdminPendingEntry[];
   checkin_code?: string | null;
   checkin_expires_at?: string | null;
+  no_show_grace_minutes?: number;
 }
 
 export interface AdminCalledEntry {
@@ -184,4 +185,31 @@ export async function adminExpireNoShows(queueId: string): Promise<number> {
   });
   if (error) throw new Error(error.message);
   return Number(data ?? 0);
+}
+
+
+export async function adminGetNoShowGrace(
+  queueId: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_get_no_show_grace", {
+    p_queue_id: queueId,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 3);
+}
+
+export async function adminSetNoShowGrace(
+  queueId: string,
+  minutes: number
+): Promise<number> {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 30) {
+    throw new Error("Grace period must be between 1 and 30 minutes.");
+  }
+
+  const { data, error } = await supabase.rpc("admin_set_no_show_grace", {
+    p_queue_id: queueId,
+    p_minutes: minutes,
+  });
+  if (error) throw new Error(error.message);
+  return Number(data);
 }
