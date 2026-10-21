@@ -11,6 +11,24 @@ ALTER TABLE public.queue_entries
   ADD COLUMN IF NOT EXISTS cancelled_at timestamptz,
   ADD COLUMN IF NOT EXISTS no_show_at timestamptz;
 
+-- Configurable grace period per queue (default 3 minutes; permitted range 1-30).
+ALTER TABLE public.queues
+  ADD COLUMN IF NOT EXISTS no_show_grace_minutes integer NOT NULL DEFAULT 3;
+
+DO $constraint$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'queues_no_show_grace_minutes_range'
+      AND conrelid = 'public.queues'::regclass
+  ) THEN
+    ALTER TABLE public.queues
+      ADD CONSTRAINT queues_no_show_grace_minutes_range
+      CHECK (no_show_grace_minutes BETWEEN 1 AND 30);
+  END IF;
+END;
+$constraint$;
+
 -- Pending verification requests must also prevent duplicate queue requests.
 DROP INDEX IF EXISTS public.unique_active_queue_user;
 CREATE UNIQUE INDEX unique_active_queue_user
@@ -424,8 +442,9 @@ BEGIN
 END;
 $function$;
 
--- Backend-time-based grace period: called entries not served within 3 minutes
--- are marked no_show whenever the admin dashboard refreshes or calls next.
+-- Backend-time-based grace period: the queue's no_show_grace_minutes setting
+-- defaults to 3 (range 1-30). Expiry runs when the admin dashboard refreshes
+-- or calls next; no background cron job is assumed by this migration.
 CREATE OR REPLACE FUNCTION public.admin_expire_no_shows(p_queue_id uuid)
  RETURNS integer
  LANGUAGE plpgsql
@@ -445,15 +464,21 @@ BEGIN
   WHERE queue_id = p_queue_id
     AND status = 'called'
     AND called_at IS NOT NULL
-    AND called_at <= now() - interval '3 minutes';
+    AND called_at <= now() - (
+      COALESCE((
+        SELECT q.no_show_grace_minutes
+        FROM public.queues q
+        WHERE q.id = p_queue_id
+      ), 3) * interval '1 minute'
+    );
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
 END;
 $function$;
 
--- Preserve the existing queue operation behavior, but timestamp call events and
--- don't let unverified pending entries get called. Overdue calls become no-shows.
+-- Preserve queue operation behavior, timestamp calls, exclude unverified entries,
+-- and mark overdue calls as no-shows using each queue's configured grace period.
 CREATE OR REPLACE FUNCTION public.admin_call_next(p_queue_id uuid)
  RETURNS TABLE(entry_id uuid, token_number integer, entry_status text)
  LANGUAGE plpgsql
@@ -484,19 +509,37 @@ BEGIN
   UPDATE public.queue_entries qe
   SET status = CASE
         WHEN qe.called_at IS NOT NULL
-         AND qe.called_at <= now() - interval '3 minutes'
+         AND qe.called_at <= now() - (
+           COALESCE((
+             SELECT q.no_show_grace_minutes
+             FROM public.queues q
+             WHERE q.id = p_queue_id
+           ), 3) * interval '1 minute'
+         )
         THEN 'no_show'
         ELSE 'completed'
       END,
       served_at = CASE
         WHEN qe.called_at IS NOT NULL
-         AND qe.called_at <= now() - interval '3 minutes'
+         AND qe.called_at <= now() - (
+           COALESCE((
+             SELECT q.no_show_grace_minutes
+             FROM public.queues q
+             WHERE q.id = p_queue_id
+           ), 3) * interval '1 minute'
+         )
         THEN qe.served_at
         ELSE now()
       END,
       no_show_at = CASE
         WHEN qe.called_at IS NOT NULL
-         AND qe.called_at <= now() - interval '3 minutes'
+         AND qe.called_at <= now() - (
+           COALESCE((
+             SELECT q.no_show_grace_minutes
+             FROM public.queues q
+             WHERE q.id = p_queue_id
+           ), 3) * interval '1 minute'
+         )
         THEN now()
         ELSE qe.no_show_at
       END
