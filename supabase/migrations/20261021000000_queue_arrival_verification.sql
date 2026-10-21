@@ -367,14 +367,14 @@ DECLARE
   v_queue_status text;
   v_token integer;
 BEGIN
+  -- Discover the queue first, then lock the queue before the entry. This matches
+  -- join_queue_secure/verify_queue_arrival lock order and avoids deadlocks.
   SELECT qe.queue_id INTO v_queue_id
   FROM public.queue_entries qe
-  WHERE qe.id = p_entry_id
-    AND qe.status = 'pending_verification'
-  FOR UPDATE;
+  WHERE qe.id = p_entry_id;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Pending verification entry not found';
+    RAISE EXCEPTION 'Queue entry not found';
   END IF;
   IF NOT public.can_manage_queue(v_queue_id) THEN
     RAISE EXCEPTION 'Access denied: not the service owner';
@@ -387,6 +387,17 @@ BEGIN
 
   IF v_queue_status IS DISTINCT FROM 'active' THEN
     RAISE EXCEPTION 'Queue must be active to verify arrival';
+  END IF;
+
+  PERFORM 1
+  FROM public.queue_entries qe
+  WHERE qe.id = p_entry_id
+    AND qe.queue_id = v_queue_id
+    AND qe.status = 'pending_verification'
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Pending verification entry not found';
   END IF;
 
   UPDATE public.queues q
@@ -423,21 +434,31 @@ DECLARE
 BEGIN
   SELECT qe.queue_id INTO v_queue_id
   FROM public.queue_entries qe
-  WHERE qe.id = p_entry_id
-    AND qe.status = 'pending_verification'
-  FOR UPDATE;
+  WHERE qe.id = p_entry_id;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Pending verification entry not found';
+    RAISE EXCEPTION 'Queue entry not found';
   END IF;
   IF NOT public.can_manage_queue(v_queue_id) THEN
     RAISE EXCEPTION 'Access denied: not the service owner';
   END IF;
 
+  -- Serialize with customer verification and token assignment.
+  PERFORM 1
+  FROM public.queues q
+  WHERE q.id = v_queue_id
+  FOR UPDATE;
+
   UPDATE public.queue_entries
   SET status = 'rejected',
       cancelled_at = now()
-  WHERE id = p_entry_id;
+  WHERE id = p_entry_id
+    AND queue_id = v_queue_id
+    AND status = 'pending_verification';
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Pending verification entry not found';
+  END IF;
 
   RETURN 'rejected';
 END;
@@ -451,10 +472,21 @@ CREATE OR REPLACE FUNCTION public.admin_mark_current_no_show(p_queue_id uuid)
  SET search_path TO ''
 AS $function$
 DECLARE
+  v_queue_status text;
   v_token integer;
 BEGIN
   IF NOT public.can_manage_queue(p_queue_id) THEN
     RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+
+  -- Lock the queue first to serialize with Call Next and completion operations.
+  SELECT q.status INTO v_queue_status
+  FROM public.queues q
+  WHERE q.id = p_queue_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Queue not found';
   END IF;
 
   SELECT qe.token_number INTO v_token
@@ -491,9 +523,19 @@ CREATE OR REPLACE FUNCTION public.admin_expire_no_shows(p_queue_id uuid)
 AS $function$
 DECLARE
   v_count integer;
+  v_grace integer;
 BEGIN
   IF NOT public.can_manage_queue(p_queue_id) THEN
     RAISE EXCEPTION 'Access denied: not the service owner';
+  END IF;
+
+  SELECT q.no_show_grace_minutes INTO v_grace
+  FROM public.queues q
+  WHERE q.id = p_queue_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Queue not found';
   END IF;
 
   UPDATE public.queue_entries
@@ -502,13 +544,7 @@ BEGIN
   WHERE queue_id = p_queue_id
     AND status = 'called'
     AND called_at IS NOT NULL
-    AND called_at <= now() - (
-      COALESCE((
-        SELECT q.no_show_grace_minutes
-        FROM public.queues q
-        WHERE q.id = p_queue_id
-      ), 3) * interval '1 minute'
-    );
+    AND called_at <= now() - (COALESCE(v_grace, 3) * interval '1 minute');
 
   GET DIAGNOSTICS v_count = ROW_COUNT;
   RETURN v_count;
