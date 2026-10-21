@@ -1,7 +1,7 @@
 -- SmartQueue arrival verification and no-show handling.
 -- Apply after 20261020000000_smartqueue_baseline.sql.
--- Pending entries reserve a token but do NOT count as people waiting.
--- Only server-validated QR check-in or an authorized staff override activates them.
+-- Pending entries do not receive a token number and are not counted as waiting.
+-- A server-validated QR check-in or authorized staff verification issues a token.
 
 BEGIN;
 
