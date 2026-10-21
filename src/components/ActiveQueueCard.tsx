@@ -36,14 +36,25 @@ export default function ActiveQueueCard({
             Service: {queue.serviceName}
           </Text>
           <Text style={styles.text}>
-            Your token: {formatQueueToken(queue.tokenNumber)}
+            Your token: {queue.tokenNumber === null
+              ? "Not assigned yet"
+              : formatQueueToken(queue.tokenNumber)}
           </Text>
           <Text style={styles.text}>
-            Status: {queue.status}
+            Status: {queue.status === "pending_verification"
+              ? "Pending arrival verification"
+              : queue.status}
           </Text>
           <Text style={styles.text}>
-            People ahead: {queue.peopleAhead}
+            People ahead: {queue.peopleAhead === null
+              ? "Not in the waiting line yet"
+              : queue.peopleAhead}
           </Text>
+          {queue.status === "pending_verification" && (
+            <Text style={styles.text}>
+              Scan the service's on-site QR code from Queue Details to activate your place in line.
+            </Text>
+          )}
           <Text style={styles.text}>
             Estimated wait:{" "}
             {queue.estimatedWaitMinutes == null
