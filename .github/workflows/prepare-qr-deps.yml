@@ -1,16 +1,23 @@
-name: Prepare QR dependencies
+name: Upgrade SmartQueue to Expo SDK 58
 
 on:
   push:
     branches: [feature/create-service-qr]
-    paths: [package.json]
+    paths:
+      - 'package.json'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: smartqueue-expo58-upgrade
+  cancel-in-progress: false
+
 jobs:
-  update-lockfile-and-typecheck:
+  upgrade-and-validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,18 +27,28 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      - name: Resolve dependency lockfile
-        run: npm install --package-lock-only --ignore-scripts
-      - name: Install and check TypeScript
-        run: |
-          npm ci --ignore-scripts
-          npx tsc --noEmit
-      - name: Commit updated lockfile on feature branch
+      - name: Install Expo SDK 58
+        run: npm install 'expo@^58.0.0' --save --ignore-scripts --no-audit --no-fund
+      - name: Align Expo and React Native dependency versions
+        env:
+          CI: '1'
+        run: npx expo install --fix --npm
+      - name: Reinstall from updated lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Diagnose Expo dependency compatibility
+        env:
+          CI: '1'
+        run: npx expo-doctor@latest
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Verify Android JavaScript bundle
+        run: npx expo export --platform android --output-dir /tmp/smartqueue-expo58-export --clear
+      - name: Commit upgraded dependency versions
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
+          git add package.json package-lock.json
           if ! git diff --staged --quiet; then
-            git commit -m "Lock Expo Camera and QR code dependencies"
+            git commit -m "Upgrade SmartQueue to Expo SDK 58"
             git push origin HEAD:feature/create-service-qr
           fi
