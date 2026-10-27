@@ -119,6 +119,16 @@ export default function Home() {
         </Pressable>
       )}
 
+      <Pressable
+        style={styles.scanButton}
+        accessibilityRole="button"
+        accessibilityLabel="Scan service QR code"
+        onPress={() => router.push("/scan-service")}
+      >
+        <Ionicons name="qr-code-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.scanButtonText}>Scan Service QR</Text>
+      </Pressable>
+
       <TextInput
         style={styles.searchInput}
         placeholder="Search services..."

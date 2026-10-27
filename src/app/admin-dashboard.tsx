@@ -236,6 +236,14 @@ export default function AdminDashboard() {
         Manage queues belonging to your services.
       </Text>
 
+      {!loading && isAdmin && (
+        <Pressable style={styles.createServiceButton}
+          accessibilityRole="button"
+          onPress={() => router.push("/create-service")}>
+          <Text style={styles.buttonText}>+ Create New Service</Text>
+        </Pressable>
+      )}
+
       {loading && <ActivityIndicator size="large" />}
 
       {!loading && error && (
@@ -352,6 +360,21 @@ export default function AdminDashboard() {
                     : "Pause Queue"}
                 </Text>
               </Pressable>
+
+              {queue.service_id ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.serviceQRButton}
+                  onPress={() => router.push({
+                    pathname: "/service-qr",
+                    params: {
+                      serviceId: queue.service_id,
+                      serviceName: queue.service_name,
+                    },
+                  })}>
+                  <Text style={styles.qrButtonText}>View Service QR Code</Text>
+                </Pressable>
+              ) : null}
 
               <Text style={styles.helperText}>
                 Skip does not call the next token.

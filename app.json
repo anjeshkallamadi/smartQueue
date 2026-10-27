@@ -32,6 +32,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SmartQueue to scan service QR codes.",
+          "barcodeScannerEnabled": true
+        }
       ]
     ],
     "experiments": {

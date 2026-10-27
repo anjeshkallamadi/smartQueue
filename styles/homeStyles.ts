@@ -39,6 +39,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  scanButton: {
+    borderRadius: 12,
+    backgroundColor: "#1D4ED8",
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 18,
+  },
+  scanButtonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 16 },
   searchInput: {
     height: 50,
     borderWidth: 1,
