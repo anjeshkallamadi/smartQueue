@@ -176,9 +176,10 @@ export default function QueueDetails() {
       ? peopleAhead * averageMinutes
       : null;
 
+  // The scanner is available to all authenticated accounts, even if they
+  // already hold an active token. The join RPC safely reuses that token.
   const scanDisabled =
     loading ||
-    Boolean(entry) ||
     !selectedServiceId ||
     queueStatus !== "active";
 
@@ -276,16 +277,16 @@ export default function QueueDetails() {
         <Text style={styles.joinButtonText}>
           {loading
             ? "Loading..."
-            : entry
-              ? "Already Joined"
-              : queueStatus !== "active"
-                ? "Queue Unavailable"
-                : "Scan Service QR"}
+            : queueStatus !== "active"
+              ? "Queue Unavailable"
+              : "Scan Service QR"}
         </Text>
       </Pressable>
-      {!entry && queueStatus === "active" && (
+      {queueStatus === "active" && (
         <Text style={styles.message}>
-          Scan the QR code for this service, then confirm to receive your token.
+          {entry
+            ? "You already have a token for this queue. You can still scan its QR code; confirming will keep your existing token."
+            : "Scan the QR code for this service, then confirm to receive your token."}
         </Text>
       )}
 
