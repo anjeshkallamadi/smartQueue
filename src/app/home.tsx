@@ -14,6 +14,7 @@ import {
 import styles from "../../styles/homeStyles";
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
+import SmartQueueLogo from "../components/SmartQueueLogo";
 
 import { checkIsAdmin } from "../services/adminQueueService";
 
@@ -90,14 +91,19 @@ export default function Home() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.logoText}>SmartQueue</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+          <SmartQueueLogo size={42} />
+          <Text style={styles.logoText}>
+            Smart<Text style={{ color: "#2FA99D" }}>Queue</Text>
+          </Text>
+        </View>
         <Pressable
           style={styles.profileButton}
           accessibilityRole="button"
           accessibilityLabel="Open your account"
           onPress={() => router.push("/profile")}
         >
-          <Ionicons name="person" size={22} color="#FFFFFF" />
+          <Ionicons name="person" size={21} color="#3986D7" />
         </Pressable>
       </View>
 
@@ -113,15 +119,14 @@ export default function Home() {
           onPress={() => router.push("/admin-dashboard")}
         >
           <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
-          <Text style={styles.adminButtonText}>
-            Open Admin Dashboard
-          </Text>
+          <Text style={styles.adminButtonText}>Open Admin Dashboard</Text>
         </Pressable>
       )}
 
       <TextInput
         style={styles.searchInput}
         placeholder="Search services..."
+        placeholderTextColor="#91A1B4"
         value={search}
         onChangeText={setSearch}
       />
@@ -130,7 +135,7 @@ export default function Home() {
       <ActiveQueueCard />
       <Text style={styles.sectionTitle}>Available Services</Text>
 
-      {loading && <ActivityIndicator size="large" />}
+      {loading && <ActivityIndicator size="large" color="#3986D7" />}
       {error && <Text style={styles.errorText}>{error}</Text>}
       {!loading && !error && filteredServices.length === 0 && (
         <Text style={styles.emptyText}>No available services found.</Text>
