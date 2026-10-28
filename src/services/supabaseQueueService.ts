@@ -391,3 +391,112 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
 
   return activeQueues;
 }
+
+
+export interface MyQueueHistoryEntry {
+  id: string;
+  queueId: string;
+  serviceName: string;
+  tokenNumber: number;
+  status: string;
+  joinedAt: string;
+  servedAt: string | null;
+}
+
+/**
+ * Loads the signed-in user's previous queue entries from Supabase.
+ * Entries still waiting or called are excluded from Queue History.
+ */
+export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in to view your queue history.");
+  }
+
+  const { data: entries, error: entriesError } = await supabase
+    .from("queue_entries")
+    .select("id, queue_id, token_number, status, joined_at, served_at")
+    .eq("user_id", userData.user.id)
+    .order("joined_at", { ascending: false });
+
+  if (entriesError) {
+    throw new Error(entriesError.message);
+  }
+
+  // Do not show entries that are still active.
+  const historyEntries = (entries ?? []).filter((entry) => {
+    const status = String(entry.status ?? "").toLowerCase();
+    return status !== "waiting" && status !== "called";
+  });
+
+  if (historyEntries.length === 0) {
+    return [];
+  }
+
+  const queueIds = [
+    ...new Set(
+      historyEntries
+        .map((entry) => entry.queue_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  const { data: queues, error: queuesError } = queueIds.length
+    ? await supabase
+        .from("queues")
+        .select("id, service_id")
+        .in("id", queueIds)
+    : { data: [], error: null };
+
+  if (queuesError) {
+    throw new Error(queuesError.message);
+  }
+
+  const serviceIds = [
+    ...new Set(
+      (queues ?? [])
+        .map((queue) => queue.service_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  const { data: services, error: servicesError } = serviceIds.length
+    ? await supabase
+        .from("services")
+        .select("id, name")
+        .in("id", serviceIds)
+    : { data: [], error: null };
+
+  if (servicesError) {
+    throw new Error(servicesError.message);
+  }
+
+  const queueMap = new Map(
+    (queues ?? []).map((queue) => [queue.id, queue])
+  );
+
+  const serviceMap = new Map(
+    (services ?? []).map((service) => [service.id, service])
+  );
+
+  return historyEntries.map((entry) => {
+    const queue = queueMap.get(entry.queue_id);
+    const service = queue?.service_id
+      ? serviceMap.get(queue.service_id)
+      : undefined;
+
+    return {
+      id: entry.id,
+      queueId: entry.queue_id,
+      serviceName: service?.name ?? "Unknown service",
+      tokenNumber: entry.token_number,
+      status: String(entry.status ?? "unknown"),
+      joinedAt: entry.joined_at,
+      servedAt: entry.served_at ?? null,
+    };
+  });
+}
+
+
