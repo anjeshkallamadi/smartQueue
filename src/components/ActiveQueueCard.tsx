@@ -1,15 +1,75 @@
+
 import { Text, View } from "react-native";
+
 import styles from "../../styles/activeQueueCardStyles";
 
-export default function ActiveQueueCard() {
+import {
+  formatQueueToken,
+  type MyActiveQueue,
+} from "../services/supabaseQueueService";
+
+interface ActiveQueueCardProps {
+  queue: MyActiveQueue | null;
+  loading: boolean;
+  error: string | null;
+}
+
+export default function ActiveQueueCard({
+  queue,
+  loading,
+  error,
+}: ActiveQueueCardProps) {
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>No active queue</Text>
+      <Text style={styles.title}>My Active Queue</Text>
 
-      <Text style={styles.text}>
-        You are not currently waiting in any queue.
-        Join a service below to get started "frontend Anjesh".
-      </Text>
+      {loading ? (
+        <Text style={styles.text}>
+          Loading your active queue...
+        </Text>
+      ) : error ? (
+        <Text style={styles.text}>{error}</Text>
+      ) : !queue ? (
+        <Text style={styles.text}>
+          You are not currently waiting in any queue.
+          {"\n"}Join a service below to get started.
+        </Text>
+      ) : (
+        <>
+          <Text style={styles.text}>
+            Service: {queue.serviceName}
+          </Text>
+
+          <Text style={styles.text}>
+            Your token: {formatQueueToken(queue.tokenNumber)}
+          </Text>
+
+          <Text style={styles.text}>
+            Status: {queue.status === "called"
+              ? "Your turn — please proceed"
+              : queue.status.charAt(0).toUpperCase() +
+                queue.status.slice(1)}
+          </Text>
+
+          <Text style={styles.text}>
+            People ahead:{" "}
+            {queue.peopleAhead == null
+              ? "Not available"
+              : queue.peopleAhead}
+          </Text>
+
+          <Text style={styles.text}>
+            Estimated wait:{" "}
+            {queue.estimatedWaitMinutes == null
+              ? "Not available"
+              : `${queue.estimatedWaitMinutes} ${
+                  queue.estimatedWaitMinutes === 1
+                    ? "minute"
+                    : "minutes"
+                }`}
+          </Text>
+        </>
+      )}
     </View>
   );
 }
