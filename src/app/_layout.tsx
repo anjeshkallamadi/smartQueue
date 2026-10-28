@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
+import { View } from "react-native";
 
 import SmartQueueSplash from "../components/SmartQueueSplash";
 import { supabase } from "../lib/supabase";
@@ -56,13 +57,24 @@ export default function RootLayout() {
     }
   }, [session, loading, segments, router]);
 
-  // Keep the animated launch screen visible until both the animation and
-  // the initial Supabase session check have completed.
-  if (!splashComplete || loading) {
-    return (
-      <SmartQueueSplash onAnimationComplete={handleSplashComplete} />
-    );
-  }
-
-  return <Stack />;
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack />
+      {(!splashComplete || loading) && (
+        <View
+          pointerEvents="auto"
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            zIndex: 10,
+          }}
+        >
+          <SmartQueueSplash onAnimationComplete={handleSplashComplete} />
+        </View>
+      )}
+    </View>
+  );
 }
