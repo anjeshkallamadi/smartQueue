@@ -1,4 +1,3 @@
-﻿import NotificationBell from "../components/NotificationBell";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -15,6 +14,7 @@ import {
 import styles from "../../styles/homeStyles";
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
+import NotificationBell from "../components/NotificationBell";
 
 import { checkIsAdmin } from "../services/adminQueueService";
 
@@ -91,18 +91,21 @@ export default function Home() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.logoText}>SmartQueue</Text> <NotificationBell />
-        <Pressable
-          style={styles.profileButton}
-          accessibilityRole="button"
-          accessibilityLabel="Open your account"
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person" size={22} color="#FFFFFF" />
-        </Pressable>
+        <Text style={styles.logoText}>SmartQueue</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <NotificationBell />
+          <Pressable
+            style={styles.profileButton}
+            accessibilityRole="button"
+            accessibilityLabel="Open your account"
+            onPress={() => router.push("/profile")}
+          >
+            <Ionicons name="person" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
 
-      <Text style={styles.greeting}>Welcome to SmartQueue ðŸ‘‹</Text>
+      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
       <Text style={styles.title}>
         Find a service and skip the waiting line.
       </Text>
@@ -158,4 +161,3 @@ export default function Home() {
     </ScrollView>
   );
 }
-
