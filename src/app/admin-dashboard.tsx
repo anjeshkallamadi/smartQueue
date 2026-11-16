@@ -1,4 +1,4 @@
-
+﻿
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -227,7 +227,7 @@ export default function AdminDashboard() {
       }
     >
       <Pressable onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
+        <Text style={styles.back}>â† Back</Text>
       </Pressable>
 
       <Text style={styles.title}>Admin Dashboard</Text>
@@ -236,7 +236,17 @@ export default function AdminDashboard() {
         Manage queues belonging to your services.
       </Text>
 
-      {!loading && isAdmin && (
+            {!loading && isAdmin && (
+        <Pressable
+          style={styles.createServiceButton}
+          onPress={() => router.navigate("/home")}
+        >
+          <Text style={styles.buttonText}>
+            Join a Queue as Customer
+          </Text>
+        </Pressable>
+      )}
+{!loading && isAdmin && (
         <Pressable style={styles.createServiceButton}
           accessibilityRole="button"
           onPress={() => router.push("/create-service")}>
@@ -376,7 +386,27 @@ export default function AdminDashboard() {
                 </Pressable>
               ) : null}
 
-              <Text style={styles.helperText}>
+                            <Pressable
+                style={[
+                  styles.serviceQRButton,
+                  (!isActive || isBusy) && styles.disabled,
+                ]}
+                disabled={!isActive || isBusy}
+                onPress={() =>
+                  router.push({
+                    pathname: "/queue-details",
+                    params: {
+                      queueId: queue.queue_id,
+                      serviceName: queue.service_name,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.qrButtonText}>
+                  Join This Queue as Customer
+                </Text>
+              </Pressable>
+<Text style={styles.helperText}>
                 Skip does not call the next token.
                 Pausing preserves all existing tokens.
               </Text>
@@ -386,3 +416,4 @@ export default function AdminDashboard() {
     </ScrollView>
   );
 }
+

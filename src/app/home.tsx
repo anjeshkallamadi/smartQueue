@@ -1,3 +1,4 @@
+﻿import NotificationBell from "../components/NotificationBell";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -90,7 +91,7 @@ export default function Home() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.logoText}>SmartQueue</Text>
+        <Text style={styles.logoText}>SmartQueue</Text> <NotificationBell />
         <Pressable
           style={styles.profileButton}
           accessibilityRole="button"
@@ -101,7 +102,7 @@ export default function Home() {
         </Pressable>
       </View>
 
-      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
+      <Text style={styles.greeting}>Welcome to SmartQueue ðŸ‘‹</Text>
       <Text style={styles.title}>
         Find a service and skip the waiting line.
       </Text>
@@ -157,3 +158,4 @@ export default function Home() {
     </ScrollView>
   );
 }
+
