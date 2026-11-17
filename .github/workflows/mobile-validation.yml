@@ -1,0 +1,38 @@
+name: Validate SmartQueue mobile app
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'styles/**'
+      - 'app.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Expo Doctor
+        env:
+          CI: '1'
+        run: npx expo-doctor@latest
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Android bundle
+        run: npx expo export --platform android --output-dir /tmp/smartqueue-android-export --clear

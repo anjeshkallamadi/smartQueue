@@ -1,4 +1,3 @@
-
 import { Text, View } from "react-native";
 
 import styles from "../../styles/activeQueueCardStyles";
@@ -45,7 +44,7 @@ export default function ActiveQueueCard({
           </Text>
 
           <Text style={styles.text}>
-            Status: {queue.status === "called"
+            Status: {queue.queueStatus === "paused" ? "Queue paused" : queue.status === "called"
               ? "Your turn — please proceed"
               : queue.status.charAt(0).toUpperCase() +
                 queue.status.slice(1)}

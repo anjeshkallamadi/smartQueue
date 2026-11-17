@@ -1,7 +1,6 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +14,7 @@ import {
 import styles from "../../styles/homeStyles";
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
+import NotificationBell from "../components/NotificationBell";
 
 import { checkIsAdmin } from "../services/adminQueueService";
 
@@ -53,20 +53,24 @@ export default function Home() {
     }
   }, []);
 
+  const activeRequest = useRef(0);
   const loadActiveQueues = useCallback(async () => {
+    const request = ++activeRequest.current;
     try {
       setActiveQueueError(null);
 
       const queues = await getMyActiveQueues();
-      setActiveQueues(queues);
+      if (request === activeRequest.current) setActiveQueues(queues);
     } catch (err) {
+      if (request !== activeRequest.current) return;
+      setActiveQueues([]);
       setActiveQueueError(
         err instanceof Error
           ? err.message
           : "Unable to load your active queues."
       );
     } finally {
-      setActiveQueueLoading(false);
+      if (request === activeRequest.current) setActiveQueueLoading(false);
     }
   }, []);
 
@@ -77,6 +81,7 @@ export default function Home() {
 
       void loadServices();
       void loadActiveQueues();
+      return () => { activeRequest.current += 1; };
     }, [loadServices, loadActiveQueues])
   );
 
@@ -133,18 +138,20 @@ export default function Home() {
     >
       <View style={styles.header}>
         <Text style={styles.logoText}>SmartQueue</Text>
-
-        <Pressable
-          style={styles.profileButton}
-          accessibilityRole="button"
-          accessibilityLabel="Open your account"
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person" size={22} color="#FFFFFF" />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <NotificationBell />
+          <Pressable
+            style={styles.profileButton}
+            accessibilityRole="button"
+            accessibilityLabel="Open your account"
+            onPress={() => router.push("/profile")}
+          >
+            <Ionicons name="person" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
 
-      <Text style={styles.greeting}>Welcome to SmartQueue!</Text>
+      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
 
       <Text style={styles.title}>
         Find a service and skip the waiting line.
@@ -155,7 +162,7 @@ export default function Home() {
           style={styles.adminButton}
           accessibilityRole="button"
           accessibilityLabel="Open Admin Dashboard"
-          onPress={() => router.push("/admin-dashboard" as any)}
+          onPress={() => router.push("/admin-dashboard")}
         >
           <Ionicons
             name="settings-outline"

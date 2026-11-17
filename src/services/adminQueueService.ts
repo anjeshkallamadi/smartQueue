@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 
 export interface ManagedQueue {
   queue_id: string;
+  service_id: string;
   service_name: string;
   queue_status: string;
   waiting_count: number;
@@ -43,7 +44,25 @@ export async function getMyManagedQueues(): Promise<ManagedQueue[]> {
     throw new Error(error.message);
   }
 
-  return (data ?? []) as ManagedQueue[];
+  const rows = (data ?? []) as Omit<ManagedQueue, "service_id">[];
+  if (rows.length === 0) return [];
+
+  // The dashboard RPC intentionally only returns owner-scoped queues.
+  // Read their service IDs separately without changing that RPC's return type.
+  const { data: records, error: lookupError } = await supabase
+    .from("queues")
+    .select("id, service_id")
+    .in("id", rows.map((row) => row.queue_id));
+  if (lookupError) {
+    throw new Error(lookupError.message);
+  }
+  const serviceIds = new Map(
+    (records ?? []).map((record) => [record.id, record.service_id])
+  );
+  return rows.map((row) => ({
+    ...row,
+    service_id: serviceIds.get(row.queue_id) ?? "",
+  }));
 }
 
 export async function adminCallNext(

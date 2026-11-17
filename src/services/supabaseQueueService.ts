@@ -1,7 +1,6 @@
-
 import { supabase } from "../lib/supabase";
 
-/** Queue entry returned by the secure join RPC. */
+/** The database uses queue UUIDs, not frontend service names. */
 export interface SecureQueueEntry {
   entry_id: string;
   queue_id: string;
@@ -10,7 +9,6 @@ export interface SecureQueueEntry {
   people_ahead: number;
 }
 
-/** Queue record stored in Supabase. */
 export interface QueueRecord {
   id: string;
   service_id: string;
@@ -23,24 +21,13 @@ export function formatQueueToken(tokenNumber: number): string {
   return `A${String(tokenNumber).padStart(3, "0")}`;
 }
 
-/** Validate a Supabase UUID. */
-function isValidQueueId(queueId: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    queueId
-  );
-}
-
 /** Atomically join a queue through the authenticated Supabase RPC. */
-export async function joinSupabaseQueue(
-  queueId: string
-): Promise<SecureQueueEntry> {
-  if (!isValidQueueId(queueId)) {
+export async function joinSupabaseQueue(queueId: string): Promise<SecureQueueEntry> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(queueId)) {
     throw new Error("A valid Supabase queue UUID is required.");
   }
 
-  const { data: userData, error: authError } =
-    await supabase.auth.getUser();
-
+  const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError || !userData.user) {
     throw new Error("Please log in before joining a queue.");
   }
@@ -48,37 +35,22 @@ export async function joinSupabaseQueue(
   const { data, error } = await supabase.rpc("join_queue_secure", {
     p_queue_id: queueId,
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   const entry = (data as SecureQueueEntry[] | null)?.[0];
-
-  if (!entry) {
-    throw new Error("The server did not return a queue entry.");
-  }
-
+  if (!entry) throw new Error("The server did not return a queue entry.");
   return entry;
 }
 
-/** Read the authenticated user's active entry in a specific queue. */
-export async function getMyActiveQueueEntry(
-  queueId: string
-): Promise<{
+/** Read the authenticated user's current active entry. */
+export async function getMyActiveQueueEntry(queueId: string): Promise<{
   id: string;
   queue_id: string;
   token_number: number;
   status: string;
   joined_at: string;
 } | null> {
-  if (!isValidQueueId(queueId)) {
-    throw new Error("A valid Supabase queue UUID is required.");
-  }
-
-  const { data: userData, error: authError } =
-    await supabase.auth.getUser();
-
+  const { data: userData, error: authError } = await supabase.auth.getUser();
   if (authError || !userData.user) {
     throw new Error("Please log in to view your queue entry.");
   }
@@ -91,37 +63,23 @@ export async function getMyActiveQueueEntry(
     .in("status", ["waiting", "called"])
     .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
+  if (error) throw new Error(error.message);
   return data;
 }
 
 /** Read a queue by its Supabase UUID. */
-export async function getSupabaseQueue(
-  queueId: string
-): Promise<QueueRecord> {
-  if (!isValidQueueId(queueId)) {
-    throw new Error("A valid Supabase queue UUID is required.");
-  }
-
+export async function getSupabaseQueue(queueId: string): Promise<QueueRecord> {
   const { data, error } = await supabase
     .from("queues")
-    .select(
-      "id, service_id, status, current_token, average_service_time"
-    )
+    .select("id, service_id, status, current_token, average_service_time")
     .eq("id", queueId)
     .single();
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
+  if (error) throw new Error(error.message);
   return data as QueueRecord;
 }
 
-/** A service that currently has an active queue. */
+
 export interface AvailableServiceQueue {
   queueId: string;
   serviceId: string;
@@ -131,10 +89,12 @@ export interface AvailableServiceQueue {
 }
 
 /**
- * Load real services and their active queues from Supabase.
+ * Loads real services and their queues from Supabase.
+ * Only active queues are shown as joinable services.
  */
 export async function getAvailableServiceQueues():
   Promise<AvailableServiceQueue[]> {
+
   const { data: queues, error: queueError } = await supabase
     .from("queues")
     .select("id, service_id, status")
@@ -168,37 +128,28 @@ export async function getAvailableServiceQueues():
   return queues.flatMap((queue) => {
     const service = serviceMap.get(queue.service_id);
 
-    if (!service) {
-      return [];
-    }
+    if (!service) return [];
 
-    return [
-      {
-        queueId: queue.id,
-        serviceId: service.id,
-        serviceName: service.name,
-        description: service.description ?? "",
-        status: queue.status,
-      },
-    ];
+    return [{
+      queueId: queue.id,
+      serviceId: service.id,
+      serviceName: service.name,
+      description: service.description ?? "",
+      status: queue.status,
+    }];
   });
 }
 
-/** Position information returned by the queue-position RPC. */
+
 export interface MyQueuePosition {
   token_number: number;
   entry_status: string;
   people_ahead: number;
 }
 
-/** Get the signed-in user's position in a specific queue. */
 export async function getMyQueuePosition(
   queueId: string
 ): Promise<MyQueuePosition> {
-  if (!isValidQueueId(queueId)) {
-    throw new Error("A valid Supabase queue UUID is required.");
-  }
-
   const { data, error } = await supabase.rpc(
     "get_my_queue_position",
     { p_queue_id: queueId }
@@ -217,14 +168,10 @@ export async function getMyQueuePosition(
   return position;
 }
 
-/** Get the token currently being served, if available. */
+
 export async function getNowServingToken(
   queueId: string
 ): Promise<number | null> {
-  if (!isValidQueueId(queueId)) {
-    throw new Error("A valid Supabase queue UUID is required.");
-  }
-
   const { data, error } = await supabase.rpc(
     "get_queue_now_serving",
     { p_queue_id: queueId }
@@ -236,162 +183,6 @@ export async function getNowServingToken(
 
   return data as number | null;
 }
-
-/** Active queue data used by the Home screen. */
-export interface MyActiveQueue {
-  queueId: string;
-  serviceName: string;
-  tokenNumber: number;
-  status: string;
-  peopleAhead: number | null;
-  estimatedWaitMinutes: number | null;
-}
-
-/**
- * Load all active queue entries belonging to the signed-in user.
- *
- * If a position lookup fails, position and estimated wait remain null.
- * This prevents the UI from incorrectly displaying a zero-minute wait.
- */
-export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
-  const { data: userData, error: authError } =
-    await supabase.auth.getUser();
-
-  if (authError || !userData.user) {
-    throw new Error("Please log in to view your active queues.");
-  }
-
-  const { data: entries, error: entriesError } = await supabase
-    .from("queue_entries")
-    .select("queue_id, token_number, status, joined_at")
-    .eq("user_id", userData.user.id)
-    .in("status", ["waiting", "called"])
-    .order("joined_at", { ascending: true });
-
-  if (entriesError) {
-    throw new Error(entriesError.message);
-  }
-
-  if (!entries?.length) {
-    return [];
-  }
-
-  const queueIds = [
-    ...new Set(
-      entries
-        .map((entry) => entry.queue_id)
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
-
-  if (!queueIds.length) {
-    return [];
-  }
-
-  const { data: queues, error: queuesError } = await supabase
-    .from("queues")
-    .select("id, service_id, average_service_time")
-    .in("id", queueIds);
-
-  if (queuesError) {
-    throw new Error(queuesError.message);
-  }
-
-  if (!queues?.length) {
-    return [];
-  }
-
-  const serviceIds = [
-    ...new Set(
-      queues
-        .map((queue) => queue.service_id)
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
-
-  const { data: services, error: servicesError } = serviceIds.length
-    ? await supabase
-        .from("services")
-        .select("id, name")
-        .in("id", serviceIds)
-    : { data: [], error: null };
-
-  if (servicesError) {
-    throw new Error(servicesError.message);
-  }
-
-  const queueMap = new Map(
-    queues.map((queue) => [queue.id, queue])
-  );
-
-  const serviceMap = new Map(
-    (services ?? []).map((service) => [service.id, service])
-  );
-
-  const activeQueues: MyActiveQueue[] = [];
-
-  for (const entry of entries) {
-    if (!entry.queue_id) {
-      continue;
-    }
-
-    const queue = queueMap.get(entry.queue_id);
-
-    if (!queue) {
-      continue;
-    }
-
-    const service = queue.service_id
-      ? serviceMap.get(queue.service_id)
-      : undefined;
-
-    let peopleAhead: number | null = null;
-
-    try {
-      const { data: positionData, error: positionError } =
-        await supabase.rpc("get_my_queue_position", {
-          p_queue_id: entry.queue_id,
-        });
-
-      if (!positionError && positionData?.length) {
-        const parsedPeopleAhead = Number(
-          positionData[0].people_ahead
-        );
-
-        if (
-          Number.isFinite(parsedPeopleAhead) &&
-          parsedPeopleAhead >= 0
-        ) {
-          peopleAhead = parsedPeopleAhead;
-        }
-      }
-    } catch {
-      // Keep position unavailable if the lookup fails.
-      peopleAhead = null;
-    }
-
-    const averageMinutes = queue.average_service_time;
-
-    const estimatedWaitMinutes =
-      peopleAhead !== null &&
-      averageMinutes !== null &&
-      averageMinutes > 0
-        ? peopleAhead * averageMinutes
-        : null;
-
-    activeQueues.push({
-      queueId: entry.queue_id,
-      serviceName: service?.name ?? "Service",
-      tokenNumber: entry.token_number,
-      status: entry.status,
-      peopleAhead,
-      estimatedWaitMinutes,
-    });
-  }
-
-  return activeQueues;
-}
-
 
 export interface MyQueueHistoryEntry {
   id: string;
@@ -499,4 +290,163 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
   });
 }
 
+/** Active queue data used by the Home screen. */
+export interface MyActiveQueue {
+  queueId: string;
+  serviceName: string;
+  tokenNumber: number;
+  status: string;
+  queueStatus: string;
+  peopleAhead: number | null;
+  estimatedWaitMinutes: number | null;
+}
 
+/**
+ * Load all active queue entries belonging to the signed-in user.
+ *
+ * If a position lookup fails, position and estimated wait remain null.
+ * This prevents the UI from incorrectly displaying a zero-minute wait.
+ */
+export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in to view your active queues.");
+  }
+
+  const { data: entries, error: entriesError } = await supabase
+    .from("queue_entries")
+    .select("queue_id, token_number, status, joined_at")
+    .eq("user_id", userData.user.id)
+    .in("status", ["waiting", "called"])
+    .order("joined_at", { ascending: true });
+
+  if (entriesError) {
+    throw new Error(entriesError.message);
+  }
+
+  if (!entries?.length) {
+    return [];
+  }
+
+  const queueIds = [
+    ...new Set(
+      entries
+        .map((entry) => entry.queue_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  if (!queueIds.length) {
+    return [];
+  }
+
+  const { data: queues, error: queuesError } = await supabase
+    .from("queues")
+    .select("id, service_id, status, average_service_time")
+    .in("id", queueIds);
+
+  if (queuesError) {
+    throw new Error(queuesError.message);
+  }
+
+  if (!queues?.length) {
+    return [];
+  }
+
+  const serviceIds = [
+    ...new Set(
+      queues
+        .map((queue) => queue.service_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  const { data: services, error: servicesError } = serviceIds.length
+    ? await supabase
+        .from("services")
+        .select("id, name")
+        .in("id", serviceIds)
+    : { data: [], error: null };
+
+  if (servicesError) {
+    throw new Error(servicesError.message);
+  }
+
+  const queueMap = new Map(
+    queues.map((queue) => [queue.id, queue])
+  );
+
+  const serviceMap = new Map(
+    (services ?? []).map((service) => [service.id, service])
+  );
+
+  const activeQueues: MyActiveQueue[] = [];
+
+  for (const entry of entries) {
+    if (!entry.queue_id) {
+      continue;
+    }
+
+    const queue = queueMap.get(entry.queue_id);
+
+    if (!queue) {
+      continue;
+    }
+
+    const service = queue.service_id
+      ? serviceMap.get(queue.service_id)
+      : undefined;
+
+    let peopleAhead: number | null = null;
+    let currentStatus = entry.status;
+
+    try {
+      const { data: positionData, error: positionError } =
+        await supabase.rpc("get_my_queue_position", {
+          p_queue_id: entry.queue_id,
+        });
+
+      if (!positionError && positionData?.length && positionData[0].token_number === entry.token_number) {
+        currentStatus = positionData[0].entry_status;
+        const parsedPeopleAhead = Number(
+          positionData[0].people_ahead
+        );
+
+        if (
+          positionData[0].people_ahead != null &&
+          Number.isFinite(parsedPeopleAhead) &&
+          parsedPeopleAhead >= 0
+        ) {
+          peopleAhead = parsedPeopleAhead;
+        }
+      }
+    } catch {
+      // Keep position unavailable if the lookup fails.
+      peopleAhead = null;
+    }
+
+    const averageMinutes = queue.average_service_time;
+
+    const estimatedWaitMinutes =
+      queue.status === "active" &&
+      peopleAhead !== null &&
+      averageMinutes !== null &&
+      averageMinutes > 0
+        ? peopleAhead * averageMinutes
+        : null;
+
+    activeQueues.push({
+      queueId: entry.queue_id,
+      serviceName: service?.name ?? "Service",
+      tokenNumber: entry.token_number,
+      status: currentStatus,
+      queueStatus: queue.status,
+      peopleAhead,
+      estimatedWaitMinutes,
+    });
+  }
+
+  return activeQueues;
+}

@@ -1,6 +1,6 @@
 
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -19,7 +19,6 @@ import {
   getMyQueuePosition,
   getNowServingToken,
   getSupabaseQueue,
-  joinSupabaseQueue,
 } from "../services/supabaseQueueService";
 
 type MyEntry = {
@@ -40,6 +39,7 @@ export default function QueueDetails() {
 
   const [entry, setEntry] = useState<MyEntry | null>(null);
   const [queueStatus, setQueueStatus] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [averageMinutes, setAverageMinutes] =
     useState<number | null>(null);
   const [peopleAhead, setPeopleAhead] =
@@ -48,19 +48,17 @@ export default function QueueDetails() {
     useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
   const [positionError, setPositionError] =
     useState<string | null>(null);
 
-  const joinInProgress = useRef(false);
-
   const loadDetails = useCallback(async () => {
     if (!queueId) {
       setMessage("No queue ID was provided.");
       setEntry(null);
+      setSelectedServiceId(null);
       setPeopleAhead(null);
       setNowServing(null);
       setLoading(false);
@@ -79,6 +77,7 @@ export default function QueueDetails() {
         ]);
 
       setQueueStatus(queue.status);
+      setSelectedServiceId(queue.service_id);
       setAverageMinutes(queue.average_service_time);
       setNowServing(currentServing);
       setEntry(myEntry);
@@ -164,53 +163,10 @@ export default function QueueDetails() {
   );
 
   const handleRefresh = async () => {
-    if (refreshing || joining) return;
+    if (refreshing) return;
 
     setRefreshing(true);
     await loadDetails();
-  };
-
-  const handleJoin = async () => {
-    if (
-      !queueId ||
-      joinInProgress.current ||
-      joining ||
-      entry
-    ) {
-      return;
-    }
-
-    joinInProgress.current = true;
-    setJoining(true);
-    setMessage(null);
-    setPositionError(null);
-
-    try {
-      const result = await joinSupabaseQueue(queueId);
-
-      setEntry({
-        id: result.entry_id,
-        queue_id: result.queue_id,
-        token_number: result.token_number,
-        status: result.entry_status,
-        joined_at: new Date().toISOString(),
-      });
-
-      setPeopleAhead(result.people_ahead);
-      setMessage("Successfully joined the queue!");
-
-      // Synchronize after joining.
-      await loadDetails();
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to join the queue."
-      );
-    } finally {
-      joinInProgress.current = false;
-      setJoining(false);
-    }
   };
 
   const estimatedWait =
@@ -220,11 +176,20 @@ export default function QueueDetails() {
       ? peopleAhead * averageMinutes
       : null;
 
-  const buttonDisabled =
+  // The scanner is available to all authenticated accounts, even if they
+  // already hold an active token. The join RPC safely reuses that token.
+  const scanDisabled =
     loading ||
-    joining ||
-    Boolean(entry) ||
+    !selectedServiceId ||
     queueStatus !== "active";
+
+  const openServiceScanner = () => {
+    if (scanDisabled || !queueId || !selectedServiceId) return;
+    router.push({
+      pathname: "/scan-service",
+      params: { serviceId: selectedServiceId, queueId },
+    });
+  };
 
   return (
     <ScrollView
@@ -301,26 +266,29 @@ export default function QueueDetails() {
       <Pressable
         style={[
           styles.joinButton,
-          buttonDisabled &&
+          scanDisabled &&
             styles.joinButtonDisabled,
         ]}
-        onPress={handleJoin}
-        disabled={buttonDisabled}
+        onPress={openServiceScanner}
+        disabled={scanDisabled}
         accessibilityRole="button"
-        accessibilityLabel="Join selected queue"
+        accessibilityLabel="Scan the selected service QR code to join"
       >
         <Text style={styles.joinButtonText}>
           {loading
             ? "Loading..."
-            : joining
-              ? "Joining..."
-              : entry
-                ? "Already Joined"
-                : queueStatus !== "active"
-                  ? "Queue Unavailable"
-                  : "Join Queue"}
+            : queueStatus !== "active"
+              ? "Queue Unavailable"
+              : "Scan Service QR"}
         </Text>
       </Pressable>
+      {queueStatus === "active" && (
+        <Text style={styles.message}>
+          {entry
+            ? "You already have a token for this queue. You can still scan its QR code; confirming will keep your existing token."
+            : "Scan the QR code for this service, then confirm to receive your token."}
+        </Text>
+      )}
 
       {message && (
         <Text

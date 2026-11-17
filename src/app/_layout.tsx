@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { supabase } from "../lib/supabase";
+import NotificationPopup from "../components/NotificationPopup";
 
 
 
@@ -63,5 +64,12 @@ export default function RootLayout() {
     );
   }
 
-  return <Stack />;
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack />
+      {session?.user.id ? (
+        <NotificationPopup key={session.user.id} userId={session.user.id} />
+      ) : null}
+    </View>
+  );
 }

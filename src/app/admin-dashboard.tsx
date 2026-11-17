@@ -236,6 +236,25 @@ export default function AdminDashboard() {
         Manage queues belonging to your services.
       </Text>
 
+      {!loading && isAdmin && (
+        <Pressable
+          style={styles.createServiceButton}
+          accessibilityRole="button"
+          onPress={() => router.navigate("/home")}
+        >
+          <Text style={styles.buttonText}>
+            Join a Queue as Customer
+          </Text>
+        </Pressable>
+      )}
+      {!loading && isAdmin && (
+        <Pressable style={styles.createServiceButton}
+          accessibilityRole="button"
+          onPress={() => router.push("/create-service")}>
+          <Text style={styles.buttonText}>+ Create New Service</Text>
+        </Pressable>
+      )}
+
       {loading && <ActivityIndicator size="large" />}
 
       {!loading && error && (
@@ -353,6 +372,42 @@ export default function AdminDashboard() {
                 </Text>
               </Pressable>
 
+              {queue.service_id ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.serviceQRButton}
+                  onPress={() => router.push({
+                    pathname: "/service-qr",
+                    params: {
+                      serviceId: queue.service_id,
+                      serviceName: queue.service_name,
+                    },
+                  })}>
+                  <Text style={styles.qrButtonText}>View Service QR Code</Text>
+                </Pressable>
+              ) : null}
+
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.serviceQRButton,
+                  (!isActive || isBusy) && styles.disabled,
+                ]}
+                disabled={!isActive || isBusy}
+                onPress={() =>
+                  router.push({
+                    pathname: "/queue-details",
+                    params: {
+                      queueId: queue.queue_id,
+                      serviceName: queue.service_name,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.qrButtonText}>
+                  Join This Queue as Customer
+                </Text>
+              </Pressable>
               <Text style={styles.helperText}>
                 Skip does not call the next token.
                 Pausing preserves all existing tokens.
