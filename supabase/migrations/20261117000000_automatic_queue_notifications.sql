@@ -2,6 +2,48 @@
 -- Review against the live schema and test in staging before deployment.
 BEGIN;
 
+-- Restrict legacy client notification permissions to match the app.
+-- The database owner executes this migration; SECURITY DEFINER trigger
+-- functions can insert independently of the authenticated app role.
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL PRIVILEGES ON TABLE public.notifications
+    FROM PUBLIC, anon, authenticated;
+REVOKE ALL PRIVILEGES (
+    id, created_at, user_id, queue_entry_id, type, message, is_read
+) ON TABLE public.notifications FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT ON TABLE public.notifications TO authenticated;
+GRANT UPDATE (is_read) ON TABLE public.notifications TO authenticated;
+
+DROP POLICY IF EXISTS "Admins can create notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Admins can update notifications" ON public.notifications;
+
+-- Keep the same owner-only access rules on both the baseline and live schema.
+DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
+CREATE POLICY "Users can view own notifications" ON public.notifications
+    FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own notifications" ON public.notifications;
+CREATE POLICY "Users can update own notifications" ON public.notifications
+    FOR UPDATE TO authenticated
+    USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Abort rather than deploy unsafe effective permissions.
+DO $permissions$
+BEGIN
+    IF has_any_column_privilege('authenticated', 'public.notifications', 'INSERT')
+       OR has_column_privilege('authenticated', 'public.notifications', 'message', 'UPDATE')
+       OR has_table_privilege('authenticated', 'public.notifications', 'DELETE')
+       OR has_table_privilege('authenticated', 'public.notifications', 'TRUNCATE')
+       OR NOT has_column_privilege('authenticated', 'public.notifications', 'is_read', 'UPDATE')
+       OR NOT has_table_privilege('authenticated', 'public.notifications', 'SELECT')
+    THEN
+        RAISE EXCEPTION 'Unexpected effective notification permissions';
+    END IF;
+END;
+$permissions$;
+
 -- Alert a waiting customer once per queue entry when at most two active
 -- tokens precede them (called tokens count, matching get_my_queue_position).
 CREATE OR REPLACE FUNCTION public.smartqueue_notify_approaching(p_queue_id uuid)
@@ -155,7 +197,7 @@ REVOKE ALL ON FUNCTION public.smartqueue_notify_approaching(uuid) FROM PUBLIC, a
 REVOKE ALL ON FUNCTION public.smartqueue_notify_entry_change() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.smartqueue_notify_queue_status() FROM PUBLIC, anon, authenticated;
 
--- Existing RLS and queue authorization are unchanged.
+-- Queue authorization and the existing queue Realtime trigger are unchanged.
 CREATE INDEX IF NOT EXISTS idx_smartqueue_notifications_user_created
     ON public.notifications (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_smartqueue_notifications_entry_type
