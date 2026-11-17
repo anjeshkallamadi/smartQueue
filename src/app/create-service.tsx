@@ -4,11 +4,14 @@ import {
   ActivityIndicator, Alert, Pressable, ScrollView,
   Text, TextInput, View,
 } from "react-native";
-import styles from "../../styles/createServiceStyles";
+import { useCreateServiceStyles } from "../../styles/createServiceStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import { checkIsAdmin } from "../services/adminQueueService";
 import { createServiceWithQueue } from "../services/serviceManagementService";
 
 export default function CreateService() {
+  const styles = useCreateServiceStyles();
+  const {colors}=useAppTheme();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checking, setChecking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -88,25 +91,25 @@ export default function CreateService() {
 
       <View style={styles.card}>
         <Text style={styles.label}>Service name *</Text>
-        <TextInput style={styles.input} placeholder="e.g. Hospital Registration"
+        <TextInput placeholderTextColor={colors.secondaryText} style={styles.input} placeholder="e.g. Hospital Registration"
           value={name} maxLength={100} onChangeText={setName} />
 
         <Text style={styles.label}>Description</Text>
-        <TextInput style={[styles.input, styles.multiline]}
+        <TextInput placeholderTextColor={colors.secondaryText} style={[styles.input, styles.multiline]}
           multiline numberOfLines={3} maxLength={500}
           placeholder="What is this service for?"
           value={description} onChangeText={setDescription} />
 
         <Text style={styles.label}>Category</Text>
-        <TextInput style={styles.input} placeholder="e.g. Healthcare"
+        <TextInput placeholderTextColor={colors.secondaryText} style={styles.input} placeholder="e.g. Healthcare"
           maxLength={60} value={category} onChangeText={setCategory} />
 
         <Text style={styles.label}>Location</Text>
-        <TextInput style={styles.input} placeholder="e.g. Main block, counter 2"
+        <TextInput placeholderTextColor={colors.secondaryText} style={styles.input} placeholder="e.g. Main block, counter 2"
           maxLength={160} value={location} onChangeText={setLocation} />
 
         <Text style={styles.label}>Average service time (minutes) *</Text>
-        <TextInput style={styles.input} keyboardType="number-pad"
+        <TextInput placeholderTextColor={colors.secondaryText} style={styles.input} keyboardType="number-pad"
           value={minutes} maxLength={3} onChangeText={setMinutes} />
 
         <Pressable style={[styles.primaryButton, submitting && styles.disabled]}

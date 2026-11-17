@@ -1,3 +1,4 @@
+import { useAppTheme } from "../context/ThemeContext";
 
 import { useCallback, useState } from "react";
 import {
@@ -43,6 +44,8 @@ function formatStatus(status: string): string {
 }
 
 export default function QueueHistoryScreen() {
+  const styles = useHistoryStyles();
+  const {colors}=useAppTheme();
   const [history, setHistory] = useState<MyQueueHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,7 +112,7 @@ export default function QueueHistoryScreen() {
 
       {loading ? (
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={colors.primaryDark} />
           <Text style={styles.stateText}>
             Loading your queue history...
           </Text>
@@ -187,10 +190,10 @@ export default function QueueHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function useHistoryStyles(){const {colors:COLORS}=useAppTheme();return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F7FB",
+    backgroundColor: COLORS.background,
   },
   content: {
     padding: 20,
@@ -205,53 +208,53 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
   },
   backText: {
-    color: "#111827",
+    color: COLORS.text,
     fontSize: 30,
     lineHeight: 34,
   },
   title: {
-    color: "#111827",
+    color: COLORS.text,
     fontSize: 23,
     fontWeight: "700",
   },
   subtitle: {
-    color: "#6B7280",
+    color: COLORS.secondaryText,
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 22,
   },
   stateContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 24,
     alignItems: "center",
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
   },
   stateText: {
-    color: "#6B7280",
+    color: COLORS.secondaryText,
     fontSize: 14,
     lineHeight: 21,
     textAlign: "center",
     marginTop: 10,
   },
   emptyTitle: {
-    color: "#111827",
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: "700",
     textAlign: "center",
   },
   errorTitle: {
-    color: "#B91C1C",
+    color: COLORS.danger,
     fontSize: 18,
     fontWeight: "700",
     textAlign: "center",
@@ -269,12 +272,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#286DB7",
     borderRadius: 16,
     padding: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
   },
   cardHeader: {
     flexDirection: "row",
@@ -286,25 +289,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceName: {
-    color: "#111827",
+    color: COLORS.text,
     fontSize: 17,
     fontWeight: "700",
   },
   date: {
-    color: "#6B7280",
+    color: COLORS.secondaryText,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 6,
   },
   statusBadge: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: COLORS.softBlue,
     paddingVertical: 6,
     paddingHorizontal: 9,
     borderRadius: 8,
     maxWidth: 120,
   },
   statusText: {
-    color: "#3730A3",
+    color: COLORS.primaryDark,
     fontSize: 12,
     fontWeight: "600",
   },
@@ -321,25 +324,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   label: {
-    color: "#6B7280",
+    color: COLORS.secondaryText,
     fontSize: 14,
   },
   value: {
     flex: 1,
-    color: "#111827",
+    color: COLORS.text,
     fontSize: 13,
     fontWeight: "500",
     textAlign: "right",
   },
   token: {
-    color: "#2563EB",
+    color: COLORS.primaryDark,
     fontSize: 18,
     fontWeight: "700",
   },
   footer: {
-    color: "#9CA3AF",
+    color: COLORS.secondaryText,
     fontSize: 12,
     textAlign: "center",
     marginTop: 8,
   },
-});
+});}

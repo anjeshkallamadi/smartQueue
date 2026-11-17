@@ -1,12 +1,13 @@
+import { useAppTheme } from "../src/context/ThemeContext";
 import { StyleSheet } from "react-native";
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F2F6FC", padding: 22,
+export function useScanServiceStyles(){const {colors:COLORS}=useAppTheme();return StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.background, padding: 22,
     paddingTop: 65, alignItems: "center" },
-  center: { flex: 1, backgroundColor: "#F2F6FC", padding: 35,
+  center: { flex: 1, backgroundColor: COLORS.background, padding: 35,
     alignItems: "center", justifyContent: "center" },
-  heading: { color: "#0F172A", fontSize: 28, fontWeight: "800", textAlign: "center" },
-  title: { color: "#0F172A", fontSize: 24, fontWeight: "800", textAlign: "center" },
-  help: { color: "#64748B", fontSize: 15, textAlign: "center",
+  heading: { color: COLORS.text, fontSize: 28, fontWeight: "800", textAlign: "center" },
+  title: { color: COLORS.text, fontSize: 24, fontWeight: "800", textAlign: "center" },
+  help: { color: COLORS.secondaryText, fontSize: 15, textAlign: "center",
     lineHeight: 22, marginTop: 12, marginBottom: 20 },
   cameraFrame: { width: "100%", maxWidth: 410, height: 350, borderRadius: 20,
     overflow: "hidden", marginTop: 24, marginBottom: 22,
@@ -16,21 +17,21 @@ const styles = StyleSheet.create({
     alignSelf: "center", borderWidth: 3, borderColor: "#FFFFFF", borderRadius: 18 },
   confirmCard: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     padding: 24,
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: COLORS.border,
     alignItems: "center",
   },
   verifiedTitle: {
-    color: "#0F766E",
+    color: COLORS.teal,
     fontSize: 22,
     fontWeight: "800",
     textAlign: "center",
   },
   verifiedService: {
-    color: "#0F172A",
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: "700",
     textAlign: "center",
@@ -40,6 +41,5 @@ const styles = StyleSheet.create({
   button: { backgroundColor: "#2563EB", paddingHorizontal: 28, paddingVertical: 15,
     borderRadius: 12, alignItems: "center", marginTop: 15 },
   buttonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
-  back: { color: "#2563EB", fontWeight: "700", marginTop: 16, fontSize: 15 },
-});
-export default styles;
+  back: { color: COLORS.primaryDark, fontWeight: "700", marginTop: 16, fontSize: 15 },
+});}

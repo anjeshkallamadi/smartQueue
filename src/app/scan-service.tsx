@@ -2,7 +2,8 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "ex
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
-import styles from "../../styles/scanServiceStyles";
+import { useScanServiceStyles } from "../../styles/scanServiceStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import {
   findActiveQueueForService,
   isValidServiceId,
@@ -12,6 +13,8 @@ import {
 import { joinSupabaseQueue } from "../services/supabaseQueueService";
 
 export default function ScanService() {
+  const styles = useScanServiceStyles();
+  const {colors}=useAppTheme();
   const { serviceId, queueId } = useLocalSearchParams<{
     serviceId?: string;
     queueId?: string;
@@ -198,7 +201,7 @@ export default function ScanService() {
         />
         <View pointerEvents="none" style={styles.scanBorder} />
       </View>
-      {resolving && <ActivityIndicator size="large" color="#2563EB" />}
+      {resolving && <ActivityIndicator size="large" color={colors.primaryDark} />}
       <Pressable style={styles.button} onPress={() => router.back()}>
         <Text style={styles.buttonText}>Cancel Scan</Text>
       </Pressable>

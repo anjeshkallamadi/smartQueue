@@ -1,10 +1,11 @@
+import { useAppTheme } from "../src/context/ThemeContext";
 
 import { StyleSheet } from "react-native";
 
-const styles = StyleSheet.create({
+export function useAdminDashboardStyles(){const {colors:COLORS}=useAppTheme();return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.background,
   },
 
   content: {
@@ -14,7 +15,7 @@ const styles = StyleSheet.create({
   },
 
   back: {
-    color: "#2563EB",
+    color: COLORS.primaryDark,
     fontSize: 16,
     marginBottom: 20,
   },
@@ -22,12 +23,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 27,
     fontWeight: "bold",
-    color: "#0F172A",
+    color: COLORS.text,
   },
 
   subtitle: {
     fontSize: 15,
-    color: "#64748B",
+    color: COLORS.secondaryText,
     marginTop: 8,
     marginBottom: 24,
   },
@@ -49,30 +50,30 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   qrButtonText: {
-    color: "#0F766E",
+    color: COLORS.teal,
     fontSize: 15,
     fontWeight: "700",
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.surface,
     padding: 20,
     borderRadius: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
   },
 
   serviceName: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 14,
-    color: "#0F172A",
+    color: COLORS.text,
   },
 
   detail: {
     fontSize: 15,
     marginBottom: 10,
-    color: "#334155",
+    color: COLORS.text,
   },
 
   buttonRow: {
@@ -110,18 +111,18 @@ const styles = StyleSheet.create({
 
   helperText: {
     fontSize: 12,
-    color: "#64748B",
+    color: COLORS.secondaryText,
     marginTop: 12,
     lineHeight: 18,
   },
 
   error: {
-    color: "#DC2626",
+    color: COLORS.danger,
     marginTop: 15,
   },
 
   message: {
-    color: "#64748B",
+    color: COLORS.secondaryText,
     fontSize: 15,
     marginTop: 15,
   },
@@ -143,6 +144,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#15803D",
   },
 
-});
-
-export default styles;
+});}
