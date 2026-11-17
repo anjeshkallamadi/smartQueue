@@ -1,6 +1,7 @@
 
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
+import QRCode from "react-native-qrcode-svg";
 import {
   ActivityIndicator,
   Alert,
@@ -18,8 +19,20 @@ import {
   adminPauseQueue,
   adminResumeQueue,
   adminSkipCurrent,
+  adminCreateQueueCheckinCode,
+  adminListPendingEntries,
+  adminVerifyPendingEntry,
+  adminRejectPendingEntry,
+  adminMarkCurrentNoShow,
+  adminCompleteCurrent,
+  adminExpireNoShows,
+  adminGetNoShowGrace,
+  adminSetNoShowGrace,
+  adminGetQueueMode,
+  adminSetQueueMode,
   checkIsAdmin,
   getMyManagedQueues,
+  type AdminPendingEntry,
   type ManagedQueue,
 } from "../services/adminQueueService";
 
@@ -43,8 +56,32 @@ export default function AdminDashboard() {
         return;
       }
 
+      // Run the server-side no-show timeout check using each queue's configured grace period.
+      const initialQueues = await getMyManagedQueues();
+      await Promise.all(
+        initialQueues.map((queue) => adminExpireNoShows(queue.queue_id))
+      );
+
       const result = await getMyManagedQueues();
-      setQueues(result);
+      const queuesWithPending = await Promise.all(
+        result.map(async (queue) => {
+          const [pendingEntries, graceMinutes, queueMode] = await Promise.all([
+            adminListPendingEntries(queue.queue_id),
+            adminGetNoShowGrace(queue.queue_id),
+            adminGetQueueMode(queue.queue_id),
+          ]);
+
+          return {
+            ...queue,
+            pending_entries: pendingEntries,
+            checkin_code: null,
+            checkin_expires_at: null,
+            no_show_grace_minutes: graceMinutes,
+            queue_mode: queueMode,
+          };
+        })
+      );
+      setQueues(queuesWithPending);
     } catch (err) {
       setQueues([]);
       setError(
@@ -57,6 +94,265 @@ export default function AdminDashboard() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleToggleQueueMode = (queue: ManagedQueue) => {
+    if (busyQueueId !== null) return;
+
+    const currentMode = queue.queue_mode ?? "virtual";
+    const nextMode = currentMode === "on_site" ? "virtual" : "on_site";
+
+    Alert.alert(
+      "Change queue mode?",
+      nextMode === "on_site"
+        ? "Switch to On-site Only? New customers must scan the current service QR before a numbered token is issued. Existing active and pending entries are preserved."
+        : "Switch to Virtual Queue? Customers can request a pending token remotely, but must still verify arrival before entering the active waiting line.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Switch Mode",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              const savedMode = await adminSetQueueMode(
+                queue.queue_id,
+                nextMode
+              );
+              setQueues((current) =>
+                current.map((item) =>
+                  item.queue_id === queue.queue_id
+                    ? { ...item, queue_mode: savedMode }
+                    : item
+                )
+              );
+              Alert.alert(
+                "Queue mode updated",
+                "This queue now uses " +
+                  (savedMode === "on_site" ? "On-site Only" : "Virtual Queue") +
+                  "."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Unable to change queue mode",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSetNoShowGrace = async (
+    queue: ManagedQueue,
+    minutes: number
+  ) => {
+    if (busyQueueId !== null) return;
+    if (minutes < 1 || minutes > 30) return;
+
+    setBusyQueueId(queue.queue_id);
+    try {
+      const savedMinutes = await adminSetNoShowGrace(queue.queue_id, minutes);
+      setQueues((current) =>
+        current.map((item) =>
+          item.queue_id === queue.queue_id
+            ? { ...item, no_show_grace_minutes: savedMinutes }
+            : item
+        )
+      );
+    } catch (err) {
+      Alert.alert(
+        "Unable to update grace period",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setBusyQueueId(null);
+    }
+  };
+
+  const handleCreateCheckinQr = async (queue: ManagedQueue) => {
+    if (busyQueueId !== null) return;
+    setBusyQueueId(queue.queue_id);
+
+    try {
+      const result = await adminCreateQueueCheckinCode(queue.queue_id);
+      setQueues((current) =>
+        current.map((item) =>
+          item.queue_id === queue.queue_id
+            ? {
+                ...item,
+                checkin_code: result.checkin_code,
+                checkin_expires_at: result.expires_at,
+              }
+            : item
+        )
+      );
+      Alert.alert(
+        "Check-in QR ready",
+        "Display this QR at the service location. It expires in 5 minutes; generating another QR revokes the previous one."
+      );
+    } catch (err) {
+      Alert.alert(
+        "Unable to create QR",
+        err instanceof Error ? err.message : "Please try again."
+      );
+    } finally {
+      setBusyQueueId(null);
+    }
+  };
+
+  const handleVerifyArrivalManually = (
+    queue: ManagedQueue,
+    entry: AdminPendingEntry
+  ) => {
+    if (busyQueueId !== null) return;
+
+    Alert.alert(
+      "Verify arrival in person?",
+      "Confirm that " +
+        entry.customer_name +
+        (entry.token_number === null
+          ? " (token not assigned yet)"
+          : " (token A" + String(entry.token_number).padStart(3, "0") + ")") +
+        " is physically present at " +
+        queue.service_name +
+        ".",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Verify Arrival",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              await adminVerifyPendingEntry(entry.entry_id);
+              await loadQueues();
+              Alert.alert("Arrival verified", "The token is now in the waiting queue.");
+            } catch (err) {
+              Alert.alert(
+                "Verification failed",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectPending = (
+    queue: ManagedQueue,
+    entry: AdminPendingEntry
+  ) => {
+    if (busyQueueId !== null) return;
+
+    Alert.alert(
+      "Reject token request?",
+      "Reject the pending request from " +
+        entry.customer_name +
+        "? It will remain in the customer's history as rejected.",
+      [
+        { text: "Keep Request", style: "cancel" },
+        {
+          text: "Reject Request",
+          style: "destructive",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              await adminRejectPendingEntry(entry.entry_id);
+              await loadQueues();
+              Alert.alert("Request rejected", "The pending request was rejected.");
+            } catch (err) {
+              Alert.alert(
+                "Reject failed",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMarkCurrentServed = (queue: ManagedQueue) => {
+    if (busyQueueId !== null || queue.called_token === null) return;
+
+    Alert.alert(
+      "Mark current token as served?",
+      "Confirm that token A" +
+        String(queue.called_token).padStart(3, "0") +
+        " has been served. It will be removed from the active queue.",
+      [
+        { text: "Keep Token", style: "cancel" },
+        {
+          text: "Mark Served",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              const token = await adminCompleteCurrent(queue.queue_id);
+              await loadQueues();
+              Alert.alert(
+                "Token completed",
+                "Token A" + String(token).padStart(3, "0") + " was marked served."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Unable to mark served",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMarkCurrentNoShow = (queue: ManagedQueue) => {
+    if (busyQueueId !== null || queue.called_token === null) return;
+
+    Alert.alert(
+      "Mark current token as no-show?",
+      "Mark token A" +
+        String(queue.called_token).padStart(3, "0") +
+        " as a no-show? This removes it from the active queue.",
+      [
+        { text: "Keep Token", style: "cancel" },
+        {
+          text: "Mark No-show",
+          style: "destructive",
+          onPress: async () => {
+            if (busyQueueId !== null) return;
+            setBusyQueueId(queue.queue_id);
+            try {
+              const token = await adminMarkCurrentNoShow(queue.queue_id);
+              await loadQueues();
+              Alert.alert(
+                "Marked as no-show",
+                "Token A" + String(token).padStart(3, "0") + " was removed from the active queue."
+              );
+            } catch (err) {
+              Alert.alert(
+                "Unable to mark no-show",
+                err instanceof Error ? err.message : "Please try again."
+              );
+            } finally {
+              setBusyQueueId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -75,7 +371,9 @@ export default function AdminDashboard() {
 
     Alert.alert(
       "Call Next Token",
-      `Call the next waiting token for ${queue.service_name}? The currently called token, if any, will be marked completed.`,
+      "Call the next verified waiting token for " +
+        queue.service_name +
+        "? Pending arrival-verification requests are not included in the waiting line.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -262,7 +560,8 @@ export default function AdminDashboard() {
           const isActive = queue.queue_status === "active";
           const isPaused = queue.queue_status === "paused";
 
-          const canCallNext = isActive && !isBusy;
+          const canCallNext =
+            isActive && queue.called_token === null && !isBusy;
 
           const canSkip =
             isActive &&
@@ -281,6 +580,29 @@ export default function AdminDashboard() {
               <Text style={styles.detail}>
                 Queue Status: {queue.queue_status}
               </Text>
+              <Text style={styles.detail}>
+                Queue Mode: {queue.queue_mode === "on_site" ? "On-site Only" : "Virtual Queue"}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.toggleButton,
+                  queue.queue_mode === "on_site"
+                    ? styles.resumeButton
+                    : styles.callButton,
+                  busyQueueId !== null && styles.disabled,
+                ]}
+                disabled={busyQueueId !== null}
+                onPress={() => handleToggleQueueMode(queue)}
+              >
+                <Text style={styles.buttonText}>
+                  {busyQueueId === queue.queue_id
+                    ? "Processing..."
+                    : queue.queue_mode === "on_site"
+                      ? "Switch to Virtual Queue"
+                      : "Switch to On-site Only"}
+                </Text>
+              </Pressable>
 
               <Text style={styles.detail}>
                 Now Serving:{" "}
@@ -295,6 +617,153 @@ export default function AdminDashboard() {
               <Text style={styles.detail}>
                 Waiting Customers: {queue.waiting_count}
               </Text>
+              <Text style={styles.detail}>
+                Pending Verification: {queue.pending_entries?.length ?? 0}
+              </Text>
+
+              <View style={{ marginTop: 6, marginBottom: 8 }}>
+                <Text style={styles.detail}>
+                  No-show grace period: {queue.no_show_grace_minutes ?? 3} minute(s)
+                </Text>
+                <View style={styles.buttonRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.button,
+                      styles.skipButton,
+                      (busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) <= 1) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) <= 1}
+                    onPress={() => void handleSetNoShowGrace(
+                      queue,
+                      (queue.no_show_grace_minutes ?? 3) - 1
+                    )}
+                  >
+                    <Text style={styles.buttonText}>− 1 minute</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.button,
+                      styles.callButton,
+                      (busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) >= 30) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || (queue.no_show_grace_minutes ?? 3) >= 30}
+                    onPress={() => void handleSetNoShowGrace(
+                      queue,
+                      (queue.no_show_grace_minutes ?? 3) + 1
+                    )}
+                  >
+                    <Text style={styles.buttonText}>+ 1 minute</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.helperText}>
+                  Range: 1–30 minutes. Expired calls are marked no-show when the dashboard refreshes or the next token is called.
+                </Text>
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.toggleButton,
+                  styles.callButton,
+                  busyQueueId !== null && styles.disabled,
+                ]}
+                disabled={busyQueueId !== null}
+                onPress={() => void handleCreateCheckinQr(queue)}
+              >
+                <Text style={styles.buttonText}>
+                  {busyQueueId === queue.queue_id
+                    ? "Processing..."
+                    : "Generate / Refresh Check-in QR"}
+                </Text>
+              </Pressable>
+
+              {queue.checkin_code && queue.checkin_expires_at && (
+                <View
+                  style={{
+                    alignItems: "center",
+                    backgroundColor: "#F9FAFB",
+                    borderRadius: 12,
+                    padding: 14,
+                    marginTop: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  <QRCode
+                    value={JSON.stringify({
+                      type: "smartqueue-checkin",
+                      queueId: queue.queue_id,
+                      code: queue.checkin_code,
+                    })}
+                    size={190}
+                    quietZone={10}
+                  />
+                  <Text style={styles.detail}>
+                    Show this QR at the service location.
+                  </Text>
+                  <Text style={styles.helperText}>
+                    Expires at {new Date(queue.checkin_expires_at).toLocaleTimeString()}.
+                  </Text>
+                </View>
+              )}
+
+              {(queue.pending_entries ?? []).length > 0 && (
+                <View style={{ marginTop: 12, marginBottom: 12 }}>
+                  <Text style={styles.detail}>Pending Arrival Requests</Text>
+                  {(queue.pending_entries ?? []).map((entry) => (
+                    <View
+                      key={entry.entry_id}
+                      style={{
+                        backgroundColor: "#F9FAFB",
+                        borderColor: "#E5E7EB",
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        padding: 12,
+                        marginTop: 10,
+                      }}
+                    >
+                      <Text style={styles.serviceName}>
+                        {entry.customer_name}
+                      </Text>
+                      <Text style={styles.detail}>
+                        {entry.token_number === null
+                          ? "Token assigned after verification"
+                          : "Token: A" + String(entry.token_number).padStart(3, "0")}
+                      </Text>
+                      <Text style={styles.helperText}>
+                        Requested: {new Date(entry.joined_at).toLocaleString()}
+                      </Text>
+                      <View style={styles.buttonRow}>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={[
+                            styles.button,
+                            styles.callButton,
+                            busyQueueId !== null && styles.disabled,
+                          ]}
+                          disabled={busyQueueId !== null}
+                          onPress={() => handleVerifyArrivalManually(queue, entry)}
+                        >
+                          <Text style={styles.buttonText}>Verify In Person</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={[
+                            styles.button,
+                            styles.skipButton,
+                            busyQueueId !== null && styles.disabled,
+                          ]}
+                          disabled={busyQueueId !== null}
+                          onPress={() => handleRejectPending(queue, entry)}
+                        >
+                          <Text style={styles.buttonText}>Reject</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               <View style={styles.buttonRow}>
                 <Pressable
@@ -310,7 +779,9 @@ export default function AdminDashboard() {
                   <Text style={styles.buttonText}>
                     {busyQueueId === queue.queue_id
                       ? "Processing..."
-                      : "Call Next"}
+                      : queue.called_token !== null
+                        ? "Mark Current First"
+                        : "Call Next"}
                   </Text>
                 </Pressable>
 
@@ -331,6 +802,35 @@ export default function AdminDashboard() {
                   </Text>
                 </Pressable>
               </View>
+
+              {queue.called_token !== null && (
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.toggleButton,
+                      styles.callButton,
+                      (busyQueueId !== null || !isActive) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || !isActive}
+                    onPress={() => handleMarkCurrentServed(queue)}
+                  >
+                    <Text style={styles.buttonText}>Mark Current as Served</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={[
+                      styles.toggleButton,
+                      styles.skipButton,
+                      (busyQueueId !== null || !isActive) && styles.disabled,
+                    ]}
+                    disabled={busyQueueId !== null || !isActive}
+                    onPress={() => handleMarkCurrentNoShow(queue)}
+                  >
+                    <Text style={styles.buttonText}>Mark Current as No-show</Text>
+                  </Pressable>
+                </>
+              )}
 
               <Pressable
                 accessibilityRole="button"

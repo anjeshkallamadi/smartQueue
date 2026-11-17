@@ -1,8 +1,9 @@
 
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,12 +21,13 @@ import {
   getNowServingToken,
   getSupabaseQueue,
   joinSupabaseQueue,
+  cancelMyQueueEntry,
 } from "../services/supabaseQueueService";
 
 type MyEntry = {
   id: string;
   queue_id: string;
-  token_number: number;
+  token_number: number | null;
   status: string;
   joined_at: string;
 };
@@ -40,6 +42,7 @@ export default function QueueDetails() {
 
   const [entry, setEntry] = useState<MyEntry | null>(null);
   const [queueStatus, setQueueStatus] = useState("");
+  const [queueMode, setQueueMode] = useState<"virtual" | "on_site">("virtual");
   const [averageMinutes, setAverageMinutes] =
     useState<number | null>(null);
   const [peopleAhead, setPeopleAhead] =
@@ -49,6 +52,7 @@ export default function QueueDetails() {
 
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -79,12 +83,13 @@ export default function QueueDetails() {
         ]);
 
       setQueueStatus(queue.status);
+      setQueueMode(queue.queue_mode === "on_site" ? "on_site" : "virtual");
       setAverageMinutes(queue.average_service_time);
       setNowServing(currentServing);
       setEntry(myEntry);
       setPeopleAhead(null);
 
-      if (myEntry) {
+      if (myEntry && myEntry.status !== "pending_verification") {
         try {
           const position = await getMyQueuePosition(queueId);
 
@@ -197,7 +202,9 @@ export default function QueueDetails() {
       });
 
       setPeopleAhead(result.people_ahead);
-      setMessage("Successfully joined the queue!");
+      setMessage(
+        "Token request created. Scan the current QR code at the service location to activate your place in the queue."
+      );
 
       // Synchronize after joining.
       await loadDetails();
@@ -211,6 +218,54 @@ export default function QueueDetails() {
       joinInProgress.current = false;
       setJoining(false);
     }
+  };
+
+  async function cancelCurrentEntry() {
+    if (!queueId || cancelling) return;
+
+    Alert.alert(
+      "Cancel queue token?",
+      "Your pending request or active queue place will be cancelled. You will need to join again to get another token.",
+      [
+        { text: "Keep Token", style: "cancel" },
+        {
+          text: "Cancel Token",
+          style: "destructive",
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              await cancelMyQueueEntry(queueId);
+              setEntry(null);
+              setPeopleAhead(null);
+              setMessage("Your queue entry has been cancelled.");
+              await loadDetails();
+            } catch (error) {
+              setMessage(
+                error instanceof Error
+                  ? error.message
+                  : "Unable to cancel your queue entry."
+              );
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  const handleOpenArrivalScanner = () => {
+    if (!queueId) return;
+
+    router.push({
+      pathname: "/verify-arrival",
+      params: {
+        queueId,
+        serviceName: Array.isArray(serviceName)
+          ? serviceName[0]
+          : serviceName ?? "Service",
+      },
+    } as any);
   };
 
   const estimatedWait =
@@ -242,8 +297,12 @@ export default function QueueDetails() {
       </Text>
 
       <Text style={styles.description}>
-        {description ??
-          "View queue information and join remotely."}
+        {description ?? "View queue information and join the service queue."}
+      </Text>
+      <Text style={styles.description}>
+        {queueMode === "on_site"
+          ? "Mode: On-site Only. Scan the service QR code at the location to receive a token."
+          : "Mode: Virtual Queue. Request a token remotely, then verify your arrival at the service before entering the waiting line."}
       </Text>
 
       <Text style={styles.sectionTitle}>
@@ -304,7 +363,7 @@ export default function QueueDetails() {
           buttonDisabled &&
             styles.joinButtonDisabled,
         ]}
-        onPress={handleJoin}
+        onPress={queueMode === "on_site" ? handleOpenArrivalScanner : handleJoin}
         disabled={buttonDisabled}
         accessibilityRole="button"
         accessibilityLabel="Join selected queue"
@@ -315,12 +374,45 @@ export default function QueueDetails() {
             : joining
               ? "Joining..."
               : entry
-                ? "Already Joined"
+                ? entry.status === "pending_verification"
+                  ? "Verification Required"
+                  : "Already Joined"
                 : queueStatus !== "active"
                   ? "Queue Unavailable"
-                  : "Join Queue"}
+                  : queueMode === "on_site"
+                    ? "Scan QR to Join"
+                    : "Join Queue"}
         </Text>
       </Pressable>
+
+      {entry?.status === "pending_verification" && (
+        <View style={styles.infoCard}>
+          <Text style={styles.sectionTitle}>Verify your arrival</Text>
+          <Text style={styles.description}>
+            Your token request does not occupy a waiting place yet. Be at the service location, scan its current SmartQueue QR code, or ask staff to verify your arrival.
+          </Text>
+          <Pressable
+            style={styles.joinButton}
+            accessibilityRole="button"
+            onPress={handleOpenArrivalScanner}
+          >
+            <Text style={styles.joinButtonText}>Scan Arrival QR Code</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {entry && ["pending_verification", "waiting", "called"].includes(entry.status) && (
+        <Pressable
+          style={[styles.joinButton, cancelling && styles.joinButtonDisabled]}
+          disabled={cancelling}
+          accessibilityRole="button"
+          onPress={cancelCurrentEntry}
+        >
+          <Text style={styles.joinButtonText}>
+            {cancelling ? "Cancelling..." : "Cancel Queue Token"}
+          </Text>
+        </Pressable>
+      )}
 
       {message && (
         <Text
@@ -338,8 +430,16 @@ export default function QueueDetails() {
           </Text>
 
           <Text style={styles.token}>
-            {formatQueueToken(entry.token_number)}
+            {entry.token_number === null
+              ? "Pending"
+              : formatQueueToken(entry.token_number)}
           </Text>
+
+          {entry.status === "pending_verification" && (
+            <Text style={styles.message}>
+              Pending arrival verification. This token is not counted in the waiting line until your arrival is confirmed.
+            </Text>
+          )}
 
           <View style={styles.resultRow}>
             <Text style={styles.resultLabel}>
@@ -371,7 +471,9 @@ export default function QueueDetails() {
             </Text>
 
             <Text style={styles.resultValue}>
-              {entry.status}
+              {entry.status === "pending_verification"
+                ? "Pending arrival verification"
+                : entry.status.replace(/_/g, " ")}
             </Text>
           </View>
 

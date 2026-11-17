@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 export interface SecureQueueEntry {
   entry_id: string;
   queue_id: string;
-  token_number: number;
+  token_number: number | null;
   entry_status: string;
   people_ahead: number;
 }
@@ -13,6 +13,7 @@ export interface QueueRecord {
   id: string;
   service_id: string;
   status: string;
+  queue_mode: "virtual" | "on_site" | string;
   current_token: number | null;
   average_service_time: number | null;
 }
@@ -46,7 +47,7 @@ export async function joinSupabaseQueue(queueId: string): Promise<SecureQueueEnt
 export async function getMyActiveQueueEntry(queueId: string): Promise<{
   id: string;
   queue_id: string;
-  token_number: number;
+  token_number: number | null;
   status: string;
   joined_at: string;
 } | null> {
@@ -60,7 +61,7 @@ export async function getMyActiveQueueEntry(queueId: string): Promise<{
     .select("id, queue_id, token_number, status, joined_at")
     .eq("queue_id", queueId)
     .eq("user_id", userData.user.id)
-    .in("status", ["waiting", "called"])
+    .in("status", ["pending_verification", "waiting", "called"])
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -71,7 +72,7 @@ export async function getMyActiveQueueEntry(queueId: string): Promise<{
 export async function getSupabaseQueue(queueId: string): Promise<QueueRecord> {
   const { data, error } = await supabase
     .from("queues")
-    .select("id, service_id, status, current_token, average_service_time")
+    .select("id, service_id, status, queue_mode, current_token, average_service_time")
     .eq("id", queueId)
     .single();
 
@@ -187,9 +188,9 @@ export async function getNowServingToken(
 export interface MyActiveQueue {
   queueId: string;
   serviceName: string;
-  tokenNumber: number;
+  tokenNumber: number | null;
   status: string;
-  peopleAhead: number;
+  peopleAhead: number | null;
   estimatedWaitMinutes: number | null;
 }
 
@@ -208,7 +209,7 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
     .from("queue_entries")
     .select("queue_id, token_number, status")
     .eq("user_id", userData.user.id)
-    .in("status", ["waiting", "called"]);
+    .in("status", ["pending_verification", "waiting", "called"]);
 
   if (entriesError) {
     throw new Error(entriesError.message);
@@ -282,6 +283,22 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
       ? serviceMap.get(queue.service_id)
       : undefined;
 
+    const averageMinutes = queue.average_service_time;
+
+    // Pending requests appear on the Home screen but never count toward
+    // waiting totals or estimated wait until arrival is verified.
+    if (entry.status === "pending_verification") {
+      activeQueues.push({
+        queueId: entry.queue_id,
+        serviceName: service?.name ?? "Service",
+        tokenNumber: null,
+        status: entry.status,
+        peopleAhead: null,
+        estimatedWaitMinutes: null,
+      });
+      continue;
+    }
+
     let peopleAhead = 0;
 
     const { data: positionData, error: positionError } =
@@ -292,8 +309,6 @@ export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
     if (!positionError && positionData?.length) {
       peopleAhead = Number(positionData[0].people_ahead);
     }
-
-    const averageMinutes = queue.average_service_time;
 
     activeQueues.push({
       queueId: entry.queue_id,
@@ -316,7 +331,7 @@ export interface MyQueueHistoryEntry {
   id: string;
   queueId: string;
   serviceName: string;
-  tokenNumber: number;
+  tokenNumber: number | null;
   status: string;
   joinedAt: string;
   servedAt: string | null;
@@ -347,7 +362,11 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
   // Do not show entries that are still active.
   const historyEntries = (entries ?? []).filter((entry) => {
     const status = String(entry.status ?? "").toLowerCase();
-    return status !== "waiting" && status !== "called";
+    return (
+      status !== "pending_verification" &&
+      status !== "waiting" &&
+      status !== "called"
+    );
   });
 
   if (historyEntries.length === 0) {
@@ -419,3 +438,49 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
 }
 
 
+
+
+export interface VerifiedQueueEntry extends SecureQueueEntry {}
+
+/** Activate the signed-in user's pending queue request using an on-site QR code. */
+export async function verifySupabaseQueueArrival(
+  queueId: string,
+  code: string
+): Promise<VerifiedQueueEntry> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in before verifying your arrival.");
+  }
+
+  const { data, error } = await supabase.rpc("verify_queue_arrival", {
+    p_queue_id: queueId,
+    p_code: code,
+  });
+
+  if (error) throw new Error(error.message);
+
+  const entry = (data as VerifiedQueueEntry[] | null)?.[0];
+  if (!entry) {
+    throw new Error("The server did not return a verified queue entry.");
+  }
+
+  return entry;
+}
+
+/** Cancel the signed-in user's own pending or active entry through the secure RPC. */
+export async function cancelMyQueueEntry(queueId: string): Promise<void> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in before cancelling a queue entry.");
+  }
+
+  const { error } = await supabase.rpc("cancel_my_queue_entry", {
+    p_queue_id: queueId,
+  });
+
+  if (error) throw new Error(error.message);
+}
