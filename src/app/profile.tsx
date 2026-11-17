@@ -80,7 +80,7 @@ export default function Profile() {
       <Pressable style={styles.option} accessibilityRole="button" onPress={() => router.push("/queue-history")}>
         <Text style={styles.optionText}>Queue History</Text><Text style={styles.optionArrow}>›</Text>
       </Pressable>
-      <Pressable style={styles.option} accessibilityRole="button" onPress={() => Alert.alert("Account Settings", "Account settings will be available in a future update.")}>
+      <Pressable style={styles.option} accessibilityRole="button" onPress={() => router.push("/account-settings")}>
         <Text style={styles.optionText}>Account Settings</Text><Text style={styles.optionArrow}>›</Text>
       </Pressable>
       <Pressable style={styles.logoutButton} accessibilityRole="button" disabled={signingOut} onPress={confirmLogout}>
