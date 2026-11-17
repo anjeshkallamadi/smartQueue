@@ -1,133 +1,24 @@
 import { StyleSheet } from "react-native";
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-
-  content: {
-    padding: 24,
-    paddingBottom: 40,
-  },
-
-  serviceName: {
-    fontSize: 30,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 8,
-  },
-
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#64748B",
-    marginBottom: 28,
-  },
-
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 14,
-  },
-
-  infoCard: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 20,
-  },
-
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-
-  infoRowLast: {
-    marginBottom: 0,
-  },
-
-  infoLabel: {
-    fontSize: 14,
-    color: "#64748B",
-    flex: 1,
-    marginRight: 12,
-  },
-
-  infoValue: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#0F172A",
-  },
-
-  joinButton: {
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-
-  joinButtonDisabled: {
-    backgroundColor: "#94A3B8",
-  },
-
-  joinButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-
-  resultCard: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 24,
-  },
-
-  tokenLabel: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 6,
-  },
-
-  token: {
-    fontSize: 36,
-    fontWeight: "700",
-    color: "#2563EB",
-    marginBottom: 22,
-  },
-
-  resultRow: {
-    marginBottom: 16,
-  },
-
-  resultLabel: {
-    fontSize: 14,
-    color: "#64748B",
-    marginBottom: 4,
-  },
-
-  resultValue: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#0F172A",
-  },
-
-  message: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#B45309",
-    marginTop: 16,
-  },
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "./theme";
+export default StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
+  serviceName: { fontSize: 30, lineHeight: 37, fontWeight: "800", color: COLORS.text, marginBottom: SPACING.sm },
+  description: { fontSize: 15, lineHeight: 23, color: COLORS.secondaryText, marginBottom: SPACING.xl },
+  sectionTitle: { fontSize: TYPOGRAPHY.heading, fontWeight: "800", color: COLORS.text, marginBottom: SPACING.md },
+  infoCard: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.lg },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: SPACING.md },
+  infoRowLast: { marginBottom: 0 },
+  infoLabel: { fontSize: TYPOGRAPHY.small, color: COLORS.secondaryText, flex: 1, marginRight: 12 },
+  infoValue: { fontSize: 15, fontWeight: "700", color: COLORS.text },
+  joinButton: { height: 54, borderRadius: RADIUS.lg, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", marginTop: SPACING.sm },
+  joinButtonDisabled: { backgroundColor: "#B7C7D8" },
+  joinButtonText: { fontSize: TYPOGRAPHY.body, fontWeight: "700", color: COLORS.surface },
+  resultCard: { backgroundColor: COLORS.softBlue, borderWidth: 1, borderColor: "#CFE5FA", borderRadius: RADIUS.xl, padding: 20, marginTop: SPACING.lg },
+  tokenLabel: { fontSize: TYPOGRAPHY.small, color: COLORS.secondaryText, marginBottom: 6 },
+  token: { fontSize: 38, fontWeight: "800", color: COLORS.primary, marginBottom: SPACING.lg },
+  resultRow: { marginBottom: SPACING.md },
+  resultLabel: { fontSize: TYPOGRAPHY.small, color: COLORS.secondaryText, marginBottom: 4 },
+  resultValue: { fontSize: TYPOGRAPHY.body, fontWeight: "700", color: COLORS.text },
+  message: { fontSize: TYPOGRAPHY.small, lineHeight: 21, color: "#A86B18", marginTop: SPACING.md },
 });
-
-export default styles;
