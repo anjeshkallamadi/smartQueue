@@ -11,35 +11,15 @@ import {
 import { router, useFocusEffect } from "expo-router";
 
 import { supabase } from "../lib/supabase";
-import {
-  getQueue,
-  getPeopleAhead,
-  getEstimatedWaitTime,
-  getQueueStatus,
-} from "../services/queueService";
+import { getMyActiveQueues, formatQueueToken, type MyActiveQueue } from "../services/supabaseQueueService";
 import styles from "../../styles/profileStyles";
-
-const SERVICES = [
-  { queueId: "hospital", name: "Harsha's Hospital" },
-  { queueId: "bank", name: "Vamsi's Bank" },
-  { queueId: "government-office", name: "Anjesh's Office" },
-];
-
-type ActiveQueueInfo = {
-  queueId: string;
-  serviceName: string;
-  token: string;
-  peopleAhead: number;
-  estimatedWaitTime: number;
-  status: string;
-};
 
 export default function Profile() {
   const [displayName, setDisplayName] = useState("SmartQueue User");
   const [email, setEmail] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
-  const [activeQueues, setActiveQueues] = useState<ActiveQueueInfo[]>([]);
+  const [activeQueues, setActiveQueues] = useState<MyActiveQueue[]>([]);
   const [queueError, setQueueError] = useState<string | null>(null);
 
   useFocusEffect(
@@ -87,35 +67,8 @@ export default function Profile() {
           );
           setEmail(userEmail);
 
-          const userQueues: ActiveQueueInfo[] = [];
-
-          for (const service of SERVICES) {
-            const entry = getQueue(service.queueId).find(
-              (item) => item.userId === user.id
-            );
-
-            if (!entry) continue;
-
-            userQueues.push({
-              queueId: service.queueId,
-              serviceName: service.name,
-              token: entry.token,
-              peopleAhead: getPeopleAhead(
-                service.queueId,
-                user.id
-              ),
-              estimatedWaitTime: getEstimatedWaitTime(
-                service.queueId,
-                user.id
-              ),
-              status: getQueueStatus(
-                service.queueId,
-                user.id
-              ),
-            });
-          }
-
-          setActiveQueues(userQueues);
+          const userQueues = await getMyActiveQueues();
+          if (isActive) setActiveQueues(userQueues);
         } catch {
           if (isActive) {
             setQueueError(
@@ -247,7 +200,7 @@ export default function Profile() {
               <View style={styles.queueInfoRow}>
                 <Text style={styles.queueInfoLabel}>Your token</Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.token}
+                  {formatQueueToken(queue.tokenNumber)}
                 </Text>
               </View>
 
@@ -256,7 +209,7 @@ export default function Profile() {
                   People ahead
                 </Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.peopleAhead}
+                  {queue.peopleAhead ?? "Not available"}
                 </Text>
               </View>
 
@@ -265,14 +218,14 @@ export default function Profile() {
                   Estimated wait
                 </Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.estimatedWaitTime} min
+                  {queue.estimatedWaitMinutes == null ? "Not available" : `${queue.estimatedWaitMinutes} min`}
                 </Text>
               </View>
 
               <View style={styles.queueInfoRow}>
                 <Text style={styles.queueInfoLabel}>Status</Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.status}
+                  {queue.queueStatus === "paused" ? "Queue paused" : queue.status}
                 </Text>
               </View>
             </View>

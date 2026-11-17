@@ -289,3 +289,164 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
     };
   });
 }
+
+/** Active queue data used by the Home screen. */
+export interface MyActiveQueue {
+  queueId: string;
+  serviceName: string;
+  tokenNumber: number;
+  status: string;
+  queueStatus: string;
+  peopleAhead: number | null;
+  estimatedWaitMinutes: number | null;
+}
+
+/**
+ * Load all active queue entries belonging to the signed-in user.
+ *
+ * If a position lookup fails, position and estimated wait remain null.
+ * This prevents the UI from incorrectly displaying a zero-minute wait.
+ */
+export async function getMyActiveQueues(): Promise<MyActiveQueue[]> {
+  const { data: userData, error: authError } =
+    await supabase.auth.getUser();
+
+  if (authError || !userData.user) {
+    throw new Error("Please log in to view your active queues.");
+  }
+
+  const { data: entries, error: entriesError } = await supabase
+    .from("queue_entries")
+    .select("queue_id, token_number, status, joined_at")
+    .eq("user_id", userData.user.id)
+    .in("status", ["waiting", "called"])
+    .order("joined_at", { ascending: true });
+
+  if (entriesError) {
+    throw new Error(entriesError.message);
+  }
+
+  if (!entries?.length) {
+    return [];
+  }
+
+  const queueIds = [
+    ...new Set(
+      entries
+        .map((entry) => entry.queue_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  if (!queueIds.length) {
+    return [];
+  }
+
+  const { data: queues, error: queuesError } = await supabase
+    .from("queues")
+    .select("id, service_id, status, average_service_time")
+    .in("id", queueIds);
+
+  if (queuesError) {
+    throw new Error(queuesError.message);
+  }
+
+  if (!queues?.length) {
+    return [];
+  }
+
+  const serviceIds = [
+    ...new Set(
+      queues
+        .map((queue) => queue.service_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  const { data: services, error: servicesError } = serviceIds.length
+    ? await supabase
+        .from("services")
+        .select("id, name")
+        .in("id", serviceIds)
+    : { data: [], error: null };
+
+  if (servicesError) {
+    throw new Error(servicesError.message);
+  }
+
+  const queueMap = new Map(
+    queues.map((queue) => [queue.id, queue])
+  );
+
+  const serviceMap = new Map(
+    (services ?? []).map((service) => [service.id, service])
+  );
+
+  const activeQueues: MyActiveQueue[] = [];
+
+  for (const entry of entries) {
+    if (!entry.queue_id) {
+      continue;
+    }
+
+    const queue = queueMap.get(entry.queue_id);
+
+    if (!queue) {
+      continue;
+    }
+
+    const service = queue.service_id
+      ? serviceMap.get(queue.service_id)
+      : undefined;
+
+    let peopleAhead: number | null = null;
+    let currentStatus = entry.status;
+
+    try {
+      const { data: positionData, error: positionError } =
+        await supabase.rpc("get_my_queue_position", {
+          p_queue_id: entry.queue_id,
+        });
+
+      if (!positionError && positionData?.length && positionData[0].token_number === entry.token_number) {
+        currentStatus = positionData[0].entry_status;
+        const parsedPeopleAhead = Number(
+          positionData[0].people_ahead
+        );
+
+        if (
+          positionData[0].people_ahead != null &&
+          Number.isFinite(parsedPeopleAhead) &&
+          parsedPeopleAhead >= 0
+        ) {
+          peopleAhead = parsedPeopleAhead;
+        }
+      }
+    } catch {
+      // Keep position unavailable if the lookup fails.
+      peopleAhead = null;
+    }
+
+    const averageMinutes = queue.average_service_time;
+
+    const estimatedWaitMinutes =
+      queue.status === "active" &&
+      peopleAhead !== null &&
+      averageMinutes !== null &&
+      averageMinutes > 0
+        ? peopleAhead * averageMinutes
+        : null;
+
+    activeQueues.push({
+      queueId: entry.queue_id,
+      serviceName: service?.name ?? "Service",
+      tokenNumber: entry.token_number,
+      status: currentStatus,
+      queueStatus: queue.status,
+      peopleAhead,
+      estimatedWaitMinutes,
+    });
+  }
+
+  return activeQueues;
+}
