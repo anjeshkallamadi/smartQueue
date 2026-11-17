@@ -1,48 +1,12 @@
 import { StyleSheet } from "react-native";
-
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "./theme";
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "center",
-  },
-
-  title: {
-    fontSize: 30,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 30,
-  },
-
-  input: {
-    height: 52,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-
-  button: {
-    height: 52,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-
-  buttonText: {
-    fontSize: 17,
-    fontWeight: "600",
-  },
-
-  registerText: {
-    textAlign: "center",
-    marginTop: 24,
-  },
+  container: { flex: 1, paddingHorizontal: SPACING.lg, justifyContent: "center", backgroundColor: COLORS.background },
+  title: { fontSize: TYPOGRAPHY.title, fontWeight: "800", color: COLORS.text, marginBottom: SPACING.sm },
+  subtitle: { fontSize: TYPOGRAPHY.body, color: COLORS.secondaryText, marginBottom: SPACING.xl },
+  input: { height: 54, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, marginBottom: SPACING.md, color: COLORS.text },
+  button: { height: 54, borderRadius: RADIUS.lg, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", marginTop: SPACING.sm },
+  buttonText: { fontSize: 17, fontWeight: "700", color: COLORS.surface },
+  registerText: { textAlign: "center", marginTop: SPACING.lg, color: COLORS.primaryDark, fontWeight: "600" },
 });
-
 export default styles;
