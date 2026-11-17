@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import styles from "../../../styles/scanServiceStyles";
+import { useScanServiceStyles } from "../../../styles/scanServiceStyles";
 import { findActiveQueueForService } from "../../services/serviceManagementService";
 
 export default function ServiceDeepLink() {
+  const styles = useScanServiceStyles();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [error, setError] = useState<string | null>(null);
 
