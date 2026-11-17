@@ -1,3 +1,5 @@
+import { AppThemeProvider, useAppTheme } from "../context/ThemeContext";
+import { StatusBar } from "expo-status-bar";
 import type { Session } from "@supabase/supabase-js";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -7,7 +9,9 @@ import { supabase } from "../lib/supabase";
 import NotificationPopup from "../components/NotificationPopup";
 import SmartQueueSplash from "../components/SmartQueueSplash";
 
-export default function RootLayout() {
+export default function RootLayout() { return <AppThemeProvider><RootContent /></AppThemeProvider>; }
+function RootContent() {
+  const {dark,colors}=useAppTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [splashComplete, setSplashComplete] = useState(false);
@@ -36,8 +40,9 @@ export default function RootLayout() {
   }, [session, loading, segments, router]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Stack />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={dark?"light":"dark"}/>
+      <Stack screenOptions={{headerStyle:{backgroundColor:colors.surface},headerTintColor:colors.text,contentStyle:{backgroundColor:colors.background}}} />
       {session?.user.id ? <NotificationPopup key={session.user.id} userId={session.user.id} /> : null}
       {(!splashComplete || loading) && (
         <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, zIndex: 100 }}>

@@ -10,7 +10,8 @@ import {
   View,
 } from "react-native";
 
-import styles from "../../styles/queueDetailsStyles";
+import { useQueueDetailsStyles } from "../../styles/queueDetailsStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import { supabase } from "../lib/supabase";
 
 import {
@@ -30,6 +31,8 @@ type MyEntry = {
 };
 
 export default function QueueDetails() {
+  const styles = useQueueDetailsStyles();
+  const {colors}=useAppTheme();
   const { queueId, serviceName, description } =
     useLocalSearchParams<{
       queueId?: string;
@@ -259,7 +262,7 @@ export default function QueueDetails() {
       {loading && (
         <ActivityIndicator
           size="large"
-          color="#2563EB"
+          color={colors.primaryDark}
         />
       )}
 

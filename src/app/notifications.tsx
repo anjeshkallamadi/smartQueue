@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
-import styles from "../../styles/notificationStyles";
+import { useNotificationStyles } from "../../styles/notificationStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import { getMyNotifications, markNotificationAsRead, markAllNotificationsAsRead, type AppNotification } from "../services/notificationService";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -17,6 +18,8 @@ const notificationTypes: Record<string, { title: string; icon: IconName }> = {
 };
 
 export default function Notifications() {
+  const styles = useNotificationStyles();
+  const {colors}=useAppTheme();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,7 +106,7 @@ export default function Notifications() {
         )}
       </View>
       <Text style={styles.subtitle}>{loading || error ? "Your queue updates" : `${notifications.length} notifications`}</Text>
-      {loading ? <ActivityIndicator size="large" color="#2563EB" /> : error ? (
+      {loading ? <ActivityIndicator size="large" color={colors.primaryDark} /> : error ? (
         <View>
           <Text style={styles.errorText}>{error}</Text>
           <Pressable accessibilityRole="button" onPress={() => { setLoading(true); void loadNotifications(); }}>
@@ -112,7 +115,7 @@ export default function Notifications() {
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={70} color="#94A3B8" />
+          <Ionicons name="notifications-off-outline" size={70} color={colors.secondaryText} />
           <Text style={styles.emptyTitle}>No Notifications</Text>
           <Text style={styles.emptyMessage}>Your queue updates and appointment alerts will appear here.</Text>
         </View>
@@ -122,7 +125,7 @@ export default function Notifications() {
           <Pressable key={notification.id} accessibilityRole="button" accessibilityLabel={info.title}
             disabled={updating || refreshing} style={[styles.card, styles.unreadCard]}
             onPress={() => void handleRead(notification)}>
-            <View style={styles.iconContainer}><Ionicons name={info.icon} size={23} color="#2563EB" /></View>
+            <View style={styles.iconContainer}><Ionicons name={info.icon} size={23} color={colors.primaryDark} /></View>
             <View style={styles.notificationContent}>
               <Text style={styles.notificationTitle}>{info.title}</Text>
               <Text style={styles.message}>{notification.message ?? "You have a new queue update."}</Text>

@@ -1,12 +1,15 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { Share, Pressable, ScrollView, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
-import styles from "../../styles/serviceQrStyles";
+import { useServiceQrStyles } from "../../styles/serviceQrStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import {
   isValidServiceId, serviceQrValue,
 } from "../services/serviceManagementService";
 
 export default function ServiceQR() {
+  const styles = useServiceQrStyles();
+  const {colors}=useAppTheme();
   const { serviceId, serviceName } = useLocalSearchParams<{
     serviceId?: string;
     serviceName?: string;

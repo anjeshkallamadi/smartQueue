@@ -1,10 +1,13 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { supabase } from "../lib/supabase";
-import styles from "../../styles/profileStyles";
+import { useProfileStyles } from "../../styles/profileStyles";
+import { getAvatarUrl } from "../services/avatarService";
 
 export default function Profile() {
+  const styles = useProfileStyles();
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("SmartQueue User");
   const [email, setEmail] = useState("");
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -14,6 +17,7 @@ export default function Profile() {
     let isActive = true;
     async function loadAccount() {
       setLoadingProfile(true);
+      setAvatar(null);
       try {
         const { data, error } = await supabase.auth.getUser();
         if (error) throw error;
@@ -30,6 +34,7 @@ export default function Profile() {
         const fallbackName = userEmail ? userEmail.split("@")[0] : "SmartQueue User";
         setDisplayName(typeof metadataName === "string" && metadataName.trim().length > 0 ? metadataName.trim() : fallbackName);
         setEmail(userEmail);
+        try { const url = await getAvatarUrl(user); if (isActive) setAvatar(url); } catch { /* show initials */ }
       } catch {
         if (isActive) Alert.alert("Unable to load account", "Please try again.");
       } finally {
@@ -72,7 +77,7 @@ export default function Profile() {
       </View>
       <View style={styles.profileSection}>
         <View style={styles.avatar}>
-          {loadingProfile ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.avatarText}>{initials}</Text>}
+          {loadingProfile ? <ActivityIndicator color="#FFFFFF" /> : avatar ? <Image source={{uri:avatar}} style={{width:90,height:90,borderRadius:45}} onError={()=>setAvatar(null)} /> : <Text style={styles.avatarText}>{initials}</Text>}
         </View>
         <Text style={styles.name}>{loadingProfile ? "Loading account..." : displayName}</Text>
         <Text style={styles.email}>{loadingProfile ? " " : email || "No email available"}</Text>

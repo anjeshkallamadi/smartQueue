@@ -1,7 +1,8 @@
 import { StyleSheet } from "react-native";
-import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "./theme";
+import { RADIUS, SPACING, TYPOGRAPHY } from "./theme";
+import { useAppTheme } from "../src/context/ThemeContext";
 
-export default StyleSheet.create({
+export function useAccountSettingsStyles(){const {colors:COLORS}=useAppTheme();return StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: SPACING.lg, paddingBottom: SPACING.xxl, gap: SPACING.md },
   header: { flexDirection: "row", alignItems: "center", marginBottom: SPACING.sm },
@@ -21,8 +22,8 @@ export default StyleSheet.create({
   secondaryButtonText: { color: COLORS.primaryDark, fontSize: TYPOGRAPHY.small, fontWeight: "700" },
   card: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.lg },
   label: { fontSize: TYPOGRAPHY.small, fontWeight: "600", color: COLORS.text, marginTop: SPACING.md, marginBottom: SPACING.xs },
-  input: { minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: "#FFFFFF", paddingHorizontal: SPACING.md, color: COLORS.text, fontSize: TYPOGRAPHY.body },
+  input: { minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, paddingHorizontal: SPACING.md, color: COLORS.text, fontSize: TYPOGRAPHY.body },
   readOnlyInput: { backgroundColor: COLORS.background, color: COLORS.secondaryText },
-  primaryButton: { minHeight: 48, borderRadius: RADIUS.md, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center", marginTop: SPACING.lg },
+  primaryButton: { minHeight: 48, borderRadius: RADIUS.md, backgroundColor: "#286DB7", alignItems: "center", justifyContent: "center", marginTop: SPACING.lg },
   primaryButtonText: { color: "#FFFFFF", fontSize: TYPOGRAPHY.body, fontWeight: "700" },
-});
+});}

@@ -1,7 +1,8 @@
 import { StyleSheet } from "react-native";
-import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "./theme";
+import { RADIUS, SPACING, TYPOGRAPHY } from "./theme";
+import { useAppTheme } from "../src/context/ThemeContext";
 
-const styles = StyleSheet.create({
+export function useProfileStyles(){const {colors:COLORS}=useAppTheme();return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -42,7 +43,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#286DB7",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.md,
@@ -51,7 +52,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 30,
     fontWeight: "700",
-    color: COLORS.surface,
+    color: "#FFFFFF",
   },
 
   name: {
@@ -161,6 +162,4 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-});
-
-export default styles;
+});}

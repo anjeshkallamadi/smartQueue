@@ -11,7 +11,8 @@ import {
   View,
 } from "react-native";
 
-import styles from "../../styles/adminDashboardStyles";
+import { useAdminDashboardStyles } from "../../styles/adminDashboardStyles";
+import { useAppTheme } from "../context/ThemeContext";
 
 import {
   adminCallNext,
@@ -24,6 +25,8 @@ import {
 } from "../services/adminQueueService";
 
 export default function AdminDashboard() {
+  const styles = useAdminDashboardStyles();
+  const {colors}=useAppTheme();
   const [queues, setQueues] = useState<ManagedQueue[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

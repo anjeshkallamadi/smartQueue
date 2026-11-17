@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppTheme } from "../context/ThemeContext";
 import { supabase } from "../lib/supabase";
 import type { AppNotification } from "../services/notificationService";
 
@@ -18,6 +19,7 @@ const titles: Record<string, string> = {
 
 // Mounted once in the root layout, keyed by the authenticated user's ID.
 export default function NotificationPopup({ userId }: { userId: string }) {
+  const {colors}=useAppTheme();
   const insets = useSafeAreaInsets();
   const [pending, setPending] = useState<AppNotification[]>([]);
   const current = pending[0];
@@ -72,15 +74,15 @@ export default function NotificationPopup({ userId }: { userId: string }) {
 
   if (!current) return null;
   const title = titles[current.type ?? ""] ?? "SmartQueue Notification";
-  const accent = current.type === "turn_called" ? "#15803D"
-    : current.type === "token_skipped" ? "#B91C1C"
-    : current.type === "turn_approaching" || current.type === "queue_paused" ? "#B45309"
-    : "#2563EB";
+  const accent = current.type === "turn_called" ? colors.success
+    : current.type === "token_skipped" ? colors.danger
+    : current.type === "turn_approaching" || current.type === "queue_paused" ? colors.warning
+    : colors.primaryDark;
   const dismiss = () => setPending(previous => previous.filter(item => item.id !== current.id));
 
   return (
     <View pointerEvents="box-none" style={[styles.overlay, { top: insets.top + 8 }]}>
-      <View style={[styles.banner, { borderLeftColor: accent }]}>
+      <View style={[styles.banner, { borderLeftColor: accent, backgroundColor:colors.surface }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${title}. ${current.message ?? "New queue update."} Open notifications`}
@@ -89,15 +91,15 @@ export default function NotificationPopup({ userId }: { userId: string }) {
         >
           <Ionicons name="notifications-outline" size={24} color={accent} />
           <View style={styles.text} accessibilityLiveRegion="polite">
-            <Text style={styles.brand}>SmartQueue</Text>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message} numberOfLines={3}>
+            <Text style={[styles.brand,{color:colors.secondaryText}]}>SmartQueue</Text>
+            <Text style={[styles.title,{color:colors.text}]}>{title}</Text>
+            <Text style={[styles.message,{color:colors.secondaryText}]} numberOfLines={3}>
               {current.message ?? "You have a new queue update."}
             </Text>
           </View>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notification" onPress={dismiss} hitSlop={8} style={styles.close}>
-          <Ionicons name="close" size={21} color="#64748B" />
+          <Ionicons name="close" size={21} color={colors.secondaryText} />
         </Pressable>
       </View>
     </View>

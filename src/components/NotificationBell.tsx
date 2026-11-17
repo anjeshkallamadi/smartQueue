@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useAppTheme } from "../context/ThemeContext";
 import { getUnreadNotificationCount } from "../services/notificationService";
 
 export default function NotificationBell() {
+  const {colors}=useAppTheme();
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
 
   useFocusEffect(
@@ -35,12 +37,12 @@ export default function NotificationBell() {
 
   return (
     <Pressable
-      style={styles.button}
+      style={[styles.button,{backgroundColor:colors.softBlue}]}
       accessibilityRole="button"
       accessibilityLabel={unreadCount === null ? "Open notifications" : `Open notifications, ${unreadCount} unread`}
       onPress={() => router.push("/notifications")}
     >
-      <Ionicons name="notifications-outline" size={25} color="#2563EB" />
+      <Ionicons name="notifications-outline" size={25} color={colors.primaryDark} />
       {unreadCount !== null && unreadCount > 0 && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
