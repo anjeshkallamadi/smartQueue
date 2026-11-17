@@ -34,10 +34,7 @@ export default function Notifications() {
     } catch (err) {
       if (requestId.current === id) setError(err instanceof Error ? err.message : "Unable to load notifications.");
     } finally {
-      if (requestId.current === id) {
-        setLoading(false);
-        setRefreshing(false);
-      }
+      if (requestId.current === id) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
@@ -55,12 +52,12 @@ export default function Notifications() {
   };
 
   const handleRead = async (notification: AppNotification) => {
-    if (notification.is_read || busy.current || refreshing || loading) return;
+    if (busy.current || refreshing || loading) return;
     busy.current = true;
     setUpdating(true);
     try {
       await markNotificationAsRead(notification.id);
-      setNotifications(previous => previous.map(item => item.id === notification.id ? { ...item, is_read: true } : item));
+      setNotifications(previous => previous.filter(item => item.id !== notification.id));
     } catch (err) {
       Alert.alert("Error", err instanceof Error ? err.message : "Could not update notification.");
     } finally {
@@ -69,40 +66,49 @@ export default function Notifications() {
     }
   };
 
-  const handleMarkAllRead = async () => {
+  const clearNotifications = async () => {
     if (busy.current || refreshing || loading) return;
     busy.current = true;
     setUpdating(true);
     try {
       await markAllNotificationsAsRead();
-      await loadNotifications();
+      setNotifications([]);
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Could not mark notifications as read.");
+      Alert.alert("Error", err instanceof Error ? err.message : "Could not clear notifications.");
     } finally {
       busy.current = false;
       setUpdating(false);
     }
   };
 
-  const unreadCount = notifications.filter(item => !item.is_read).length;
+  const handleClear = () => {
+    if (busy.current || refreshing || loading || notifications.length === 0) return;
+    Alert.alert("Clear notifications?", "This will clear all current notifications from your inbox.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Clear", style: "destructive", onPress: () => { void clearNotifications(); } },
+    ]);
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
       <Stack.Screen options={{ title: "Notifications" }} />
       <View style={styles.header}>
         <Text style={styles.title}>Notifications</Text>
-        {!loading && !error && unreadCount > 0 && (
-          <Pressable accessibilityRole="button" disabled={updating || refreshing} onPress={handleMarkAllRead}>
-            <Text style={styles.markAll}>Mark all as read</Text>
+        {!loading && !error && notifications.length > 0 && (
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear all notifications"
+            disabled={updating || refreshing} onPress={handleClear}>
+            <Text style={styles.markAll}>{updating ? "Clearing..." : "Clear"}</Text>
           </Pressable>
         )}
       </View>
-      <Text style={styles.subtitle}>{loading || error ? "Your queue updates" : `${unreadCount} unread notifications`}</Text>
-      {loading ? (
-        <ActivityIndicator size="large" color="#2563EB" />
-      ) : error ? (
+      <Text style={styles.subtitle}>{loading || error ? "Your queue updates" : `${notifications.length} notifications`}</Text>
+      {loading ? <ActivityIndicator size="large" color="#2563EB" /> : error ? (
         <View>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable accessibilityRole="button" onPress={() => { setLoading(true); void loadNotifications(); }}><Text style={styles.retryText}>Try Again</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => { setLoading(true); void loadNotifications(); }}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </Pressable>
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -113,14 +119,16 @@ export default function Notifications() {
       ) : notifications.map(notification => {
         const info = notificationTypes[notification.type ?? ""] ?? { title: "SmartQueue Notification", icon: "notifications-outline" as IconName };
         return (
-          <Pressable key={notification.id} accessibilityRole="button" accessibilityLabel={`${info.title}${notification.is_read ? "" : ", unread"}`} disabled={updating || refreshing} style={[styles.card, !notification.is_read && styles.unreadCard]} onPress={() => void handleRead(notification)}>
+          <Pressable key={notification.id} accessibilityRole="button" accessibilityLabel={info.title}
+            disabled={updating || refreshing} style={[styles.card, styles.unreadCard]}
+            onPress={() => void handleRead(notification)}>
             <View style={styles.iconContainer}><Ionicons name={info.icon} size={23} color="#2563EB" /></View>
             <View style={styles.notificationContent}>
               <Text style={styles.notificationTitle}>{info.title}</Text>
               <Text style={styles.message}>{notification.message ?? "You have a new queue update."}</Text>
               <Text style={styles.time}>{new Date(notification.created_at).toLocaleString()}</Text>
             </View>
-            {!notification.is_read && <View style={styles.unreadDot} />}
+            <View style={styles.unreadDot} />
           </Pressable>
         );
       })}
