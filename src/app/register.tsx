@@ -7,10 +7,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import styles from "../../styles/registerStyles";
+import { useRegisterStyles } from "../../styles/registerStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import { supabase } from "../lib/supabase";
 
 export default function Register() {
+  const styles = useRegisterStyles();
+  const {colors}=useAppTheme();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,7 +65,7 @@ export default function Register() {
         Create your SmartQueue account
       </Text>
 
-      <TextInput
+      <TextInput placeholderTextColor={colors.secondaryText}
         style={styles.input}
         placeholder="Full Name"
         autoCapitalize="words"
@@ -70,7 +73,7 @@ export default function Register() {
         onChangeText={setName}
       />
 
-      <TextInput
+      <TextInput placeholderTextColor={colors.secondaryText}
         style={styles.input}
         placeholder="Email"
         keyboardType="email-address"
@@ -79,7 +82,7 @@ export default function Register() {
         onChangeText={setEmail}
       />
 
-      <TextInput
+      <TextInput placeholderTextColor={colors.secondaryText}
         style={styles.input}
         placeholder="Password"
         secureTextEntry
@@ -87,7 +90,7 @@ export default function Register() {
         onChangeText={setPassword}
       />
 
-      <TextInput
+      <TextInput placeholderTextColor={colors.secondaryText}
         style={styles.input}
         placeholder="Confirm Password"
         secureTextEntry

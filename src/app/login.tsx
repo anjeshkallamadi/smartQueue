@@ -7,10 +7,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import styles from "../../styles/loginStyles";
+import { useLoginStyles } from "../../styles/loginStyles";
+import { useAppTheme } from "../context/ThemeContext";
 import { supabase } from "../lib/supabase";
 
 export default function Login() {
+  const styles = useLoginStyles();
+  const {colors}=useAppTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -41,7 +44,7 @@ export default function Login() {
         Login to continue using SmartQueue
       </Text>
 
-      <TextInput
+      <TextInput placeholderTextColor={colors.secondaryText}
         style={styles.input}
         placeholder="Email"
         keyboardType="email-address"
@@ -50,7 +53,7 @@ export default function Login() {
         onChangeText={setEmail}
       />
 
-      <TextInput
+      <TextInput placeholderTextColor={colors.secondaryText}
         style={styles.input}
         placeholder="Password"
         secureTextEntry
