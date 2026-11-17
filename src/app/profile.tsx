@@ -283,12 +283,7 @@ export default function Profile() {
       <Pressable
         style={styles.option}
         accessibilityRole="button"
-        onPress={() =>
-          Alert.alert(
-            "Queue History",
-            "Queue history will be available in a future update."
-          )
-        }
+        onPress={() => router.push("/queue-history")}
       >
         <Text style={styles.optionText}>Queue History</Text>
         <Text style={styles.optionArrow}>›</Text>

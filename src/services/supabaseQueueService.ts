@@ -184,10 +184,6 @@ export async function getNowServingToken(
   return data as number | null;
 }
 
-
-
-
-
 export interface MyQueueHistoryEntry {
   id: string;
   queueId: string;
@@ -293,5 +289,3 @@ export async function getMyQueueHistory(): Promise<MyQueueHistoryEntry[]> {
     };
   });
 }
-
-

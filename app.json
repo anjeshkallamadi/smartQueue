@@ -39,7 +39,10 @@
           "cameraPermission": "Allow SmartQueue to scan service QR codes.",
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
