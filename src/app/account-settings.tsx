@@ -22,7 +22,11 @@ export default function AccountSettingsScreen() {
   const [loadingAccount, setLoadingAccount] = useState(true);
   const [savingName, setSavingName] = useState(false);
   const [changingEmail, setChangingEmail] = useState(false);
-  const [sendingReset, setSendingReset] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const busy = savingName || changingEmail || changingPassword;
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useFocusEffect(
@@ -32,6 +36,9 @@ export default function AccountSettingsScreen() {
       async function loadAccount() {
         setLoadingAccount(true);
         setLoadError(null);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
 
         try {
           const { data, error } = await supabase.auth.getUser();
@@ -83,6 +90,7 @@ export default function AccountSettingsScreen() {
   );
 
   async function handleSaveName() {
+    if (busy) return;
     const cleanName = displayName.trim();
 
     if (!cleanName) {
@@ -117,6 +125,7 @@ export default function AccountSettingsScreen() {
   }
 
   async function handleChangeEmail() {
+    if (busy) return;
     const cleanEmail = newEmail.trim().toLowerCase();
 
     if (!currentEmail) {
@@ -137,13 +146,18 @@ export default function AccountSettingsScreen() {
     setChangingEmail(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { data, error } = await supabase.auth.updateUser({
         email: cleanEmail,
       });
 
       if (error) throw error;
 
       setNewEmail("");
+      if (data.user?.email === cleanEmail) {
+        setCurrentEmail(cleanEmail);
+        Alert.alert("Email updated", "Your sign-in email has been updated.");
+        return;
+      }
       Alert.alert(
         "Confirmation required",
         "Supabase has accepted the email change request. Check your inboxes and follow the confirmation instructions. Your account email may not change until verification is complete."
@@ -158,34 +172,46 @@ export default function AccountSettingsScreen() {
     }
   }
 
-  async function handlePasswordReset() {
-    if (!currentEmail) {
-      Alert.alert("Email unavailable", "We could not find an email address for this account.");
+  async function handleChangePassword() {
+    if (busy) return;
+    if (!currentPassword) {
+      Alert.alert("Current password required", "Enter your existing password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      Alert.alert("Password too short", "Use at least 8 characters.");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      Alert.alert("Choose a different password", "Your new password must differ from your current password.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Passwords do not match", "Re-enter your new password.");
       return;
     }
 
-    setSendingReset(true);
-
+    setChangingPassword(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        currentEmail
-      );
-
+      const { error } = await supabase.auth.updateUser({
+        current_password: currentPassword,
+        password: newPassword,
+      });
       if (error) throw error;
-
-      Alert.alert(
-        "Reset email sent",
-        "Check " +
-          currentEmail +
-          " for the password-reset link. Open it on a device where SmartQueue is installed and follow the instructions."
-      );
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      Alert.alert("Password updated", "Use your new password the next time you sign in.");
     } catch (error) {
-      Alert.alert(
-        "Unable to send reset email",
-        error instanceof Error ? error.message : "Please try again."
-      );
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      const message = error && typeof error === "object" && "message" in error
+        ? String(error.message)
+        : "Please try again.";
+      Alert.alert("Unable to change password", message + " If recent sign-in is required, sign out and sign in again before retrying.");
     } finally {
-      setSendingReset(false);
+      setChangingPassword(false);
     }
   }
 
@@ -257,7 +283,7 @@ export default function AccountSettingsScreen() {
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={60}
-                editable={!savingName}
+                editable={!busy}
                 accessibilityLabel="Display name"
                 returnKeyType="done"
               />
@@ -265,9 +291,9 @@ export default function AccountSettingsScreen() {
               <Pressable
                 style={[
                   styles.primaryButton,
-                  savingName && styles.buttonDisabled,
+                  busy && styles.buttonDisabled,
                 ]}
-                disabled={savingName}
+                disabled={busy}
                 onPress={() => void handleSaveName()}
                 accessibilityRole="button"
               >
@@ -310,7 +336,7 @@ export default function AccountSettingsScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="email"
-                editable={!changingEmail}
+                editable={!busy}
                 accessibilityLabel="New email address"
                 returnKeyType="done"
               />
@@ -322,9 +348,9 @@ export default function AccountSettingsScreen() {
               <Pressable
                 style={[
                   styles.primaryButton,
-                  changingEmail && styles.buttonDisabled,
+                  busy && styles.buttonDisabled,
                 ]}
-                disabled={changingEmail}
+                disabled={busy}
                 onPress={() => void handleChangeEmail()}
                 accessibilityRole="button"
               >
@@ -344,34 +370,45 @@ export default function AccountSettingsScreen() {
                   <Text style={styles.iconText}>*</Text>
                 </View>
                 <View style={styles.sectionHeadingCopy}>
-                  <Text style={styles.sectionTitle}>Password reset</Text>
+                  <Text style={styles.sectionTitle}>Change password</Text>
                   <Text style={styles.helpText}>
-                    We will send a secure reset link to your current email.
+                    Confirm your current password before choosing a new one.
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.readOnlyField}>
-                <Text style={styles.readOnlyText}>
-                  {currentEmail || "No email available"}
-                </Text>
-              </View>
+              <Text style={styles.label}>Current password</Text>
+              <TextInput style={styles.input} value={currentPassword}
+                onChangeText={setCurrentPassword} secureTextEntry
+                autoCapitalize="none" autoCorrect={false}
+                autoComplete="current-password" editable={!busy}
+                accessibilityLabel="Current password" />
+              <Text style={styles.label}>New password</Text>
+              <TextInput style={styles.input} value={newPassword}
+                onChangeText={setNewPassword} secureTextEntry
+                autoCapitalize="none" autoCorrect={false}
+                autoComplete="new-password" editable={!busy}
+                accessibilityLabel="New password" />
+              <Text style={styles.label}>Confirm new password</Text>
+              <TextInput style={styles.input} value={confirmPassword}
+                onChangeText={setConfirmPassword} secureTextEntry
+                autoCapitalize="none" autoCorrect={false}
+                autoComplete="new-password" editable={!busy}
+                accessibilityLabel="Confirm new password" />
+              <Text style={styles.note}>
+                Use at least 8 characters and follow your account's password requirements.
+              </Text>
 
               <Pressable
-                style={[
-                  styles.secondaryButton,
-                  sendingReset && styles.buttonDisabled,
-                ]}
-                disabled={sendingReset}
-                onPress={() => void handlePasswordReset()}
+                style={[styles.primaryButton, busy && styles.buttonDisabled]}
+                disabled={busy}
+                onPress={() => void handleChangePassword()}
                 accessibilityRole="button"
               >
-                {sendingReset ? (
-                  <ActivityIndicator color="#2563EB" />
+                {changingPassword ? (
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.secondaryButtonText}>
-                    Send password-reset email
-                  </Text>
+                  <Text style={styles.primaryButtonText}>Change password</Text>
                 )}
               </Pressable>
             </View>
@@ -379,7 +416,7 @@ export default function AccountSettingsScreen() {
         )}
 
         <Text style={styles.footer}>
-          Email confirmation and password-reset links depend on your Supabase Auth email and redirect settings.
+          Email changes depend on your Supabase Auth confirmation settings.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

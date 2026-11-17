@@ -1,7 +1,6 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +14,7 @@ import {
 import styles from "../../styles/homeStyles";
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
+import NotificationBell from "../components/NotificationBell";
 
 import { checkIsAdmin } from "../services/adminQueueService";
 
@@ -27,11 +27,13 @@ import {
 
 export default function Home() {
   const [services, setServices] = useState<AvailableServiceQueue[]>([]);
-  const [activeQueue, setActiveQueue] = useState<MyActiveQueue | null>(null);
+  const [activeQueues, setActiveQueues] = useState<MyActiveQueue[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeQueueLoading, setActiveQueueLoading] = useState(true);
-  const [activeQueueError, setActiveQueueError] = useState<string | null>(null);
+  const [activeQueueError, setActiveQueueError] = useState<string | null>(
+    null
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -39,6 +41,7 @@ export default function Home() {
   const loadServices = useCallback(async () => {
     try {
       setError(null);
+
       const result = await getAvailableServiceQueues();
       setServices(result);
     } catch (err) {
@@ -50,22 +53,24 @@ export default function Home() {
     }
   }, []);
 
-  const loadActiveQueue = useCallback(async () => {
+  const activeRequest = useRef(0);
+  const loadActiveQueues = useCallback(async () => {
+    const request = ++activeRequest.current;
     try {
       setActiveQueueError(null);
 
       const queues = await getMyActiveQueues();
-
-      // Show the first active queue on the Home screen.
-      setActiveQueue(queues[0] ?? null);
+      if (request === activeRequest.current) setActiveQueues(queues);
     } catch (err) {
+      if (request !== activeRequest.current) return;
+      setActiveQueues([]);
       setActiveQueueError(
         err instanceof Error
           ? err.message
-          : "Unable to load your active queue."
+          : "Unable to load your active queues."
       );
     } finally {
-      setActiveQueueLoading(false);
+      if (request === activeRequest.current) setActiveQueueLoading(false);
     }
   }, []);
 
@@ -75,21 +80,27 @@ export default function Home() {
       setActiveQueueLoading(true);
 
       void loadServices();
-      void loadActiveQueue();
-    }, [loadServices, loadActiveQueue])
+      void loadActiveQueues();
+      return () => { activeRequest.current += 1; };
+    }, [loadServices, loadActiveQueues])
   );
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+
       setIsAdmin(false);
 
       checkIsAdmin()
         .then((allowed) => {
-          if (active) setIsAdmin(allowed);
+          if (active) {
+            setIsAdmin(allowed);
+          }
         })
         .catch(() => {
-          if (active) setIsAdmin(false);
+          if (active) {
+            setIsAdmin(false);
+          }
         });
 
       return () => {
@@ -102,13 +113,15 @@ export default function Home() {
     setRefreshing(true);
     setActiveQueueLoading(true);
 
-    await Promise.all([loadServices(), loadActiveQueue()]);
-
-    setRefreshing(false);
+    try {
+      await Promise.all([loadServices(), loadActiveQueues()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const filteredServices = services.filter((service) =>
-    service.serviceName.toLowerCase().includes(search.toLowerCase())
+    service.serviceName.toLowerCase().includes(search.toLowerCase().trim())
   );
 
   return (
@@ -125,18 +138,20 @@ export default function Home() {
     >
       <View style={styles.header}>
         <Text style={styles.logoText}>SmartQueue</Text>
-
-        <Pressable
-          style={styles.profileButton}
-          accessibilityRole="button"
-          accessibilityLabel="Open your account"
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person" size={22} color="#FFFFFF" />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <NotificationBell />
+          <Pressable
+            style={styles.profileButton}
+            accessibilityRole="button"
+            accessibilityLabel="Open your account"
+            onPress={() => router.push("/profile")}
+          >
+            <Ionicons name="person" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
 
-      <Text style={styles.greeting}>Welcome to SmartQueue!</Text>
+      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
 
       <Text style={styles.title}>
         Find a service and skip the waiting line.
@@ -146,13 +161,15 @@ export default function Home() {
         <Pressable
           style={styles.adminButton}
           accessibilityRole="button"
-          onPress={() => router.push("/admin-dashboard" as any)}
+          accessibilityLabel="Open Admin Dashboard"
+          onPress={() => router.push("/admin-dashboard")}
         >
           <Ionicons
             name="settings-outline"
             size={22}
             color="#FFFFFF"
           />
+
           <Text style={styles.adminButtonText}>
             Open Admin Dashboard
           </Text>
@@ -164,15 +181,62 @@ export default function Home() {
         placeholder="Search services..."
         value={search}
         onChangeText={setSearch}
+        autoCapitalize="none"
+        clearButtonMode="while-editing"
+        accessibilityLabel="Search available services"
       />
 
-      <Text style={styles.sectionTitle}>My Active Queue</Text>
+      <Text style={styles.sectionTitle}>My Active Queues</Text>
 
-      <ActiveQueueCard
-        queue={activeQueue}
-        loading={activeQueueLoading}
-        error={activeQueueError}
-      />
+      {activeQueueLoading ? (
+        <View style={{ paddingVertical: 16 }}>
+          <ActivityIndicator size="small" />
+          <Text
+            style={{
+              textAlign: "center",
+              marginTop: 8,
+              color: "#666666",
+            }}
+          >
+            Loading your active queues...
+          </Text>
+        </View>
+      ) : activeQueueError ? (
+        <View style={{ paddingVertical: 12 }}>
+          <Text style={styles.errorText}>{activeQueueError}</Text>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setActiveQueueLoading(true);
+              void loadActiveQueues();
+            }}
+            style={{ paddingVertical: 10 }}
+          >
+            <Text style={{ color: "#2563EB", fontWeight: "600" }}>
+              Try again
+            </Text>
+          </Pressable>
+        </View>
+      ) : activeQueues.length === 0 ? (
+        <ActiveQueueCard
+          queue={null}
+          loading={false}
+          error={null}
+        />
+      ) : (
+        <View style={{ gap: 12 }}>
+          {activeQueues.map((queue) => (
+            <View key={queue.queueId}>
+              <ActiveQueueCard
+                queue={queue}
+                loading={false}
+                error={null}
+              />
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.sectionTitle}>Available Services</Text>
 
@@ -182,11 +246,14 @@ export default function Home() {
 
       {!loading && !error && filteredServices.length === 0 && (
         <Text style={styles.emptyText}>
-          No available services found.
+          {search.trim()
+            ? "No services match your search."
+            : "No available services found."}
         </Text>
       )}
 
       {!loading &&
+        !error &&
         filteredServices.map((service) => (
           <ServiceCard
             key={service.queueId}

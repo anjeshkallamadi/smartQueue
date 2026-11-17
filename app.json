@@ -26,21 +26,23 @@
     "plugins": [
       "expo-router",
       [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow SmartQueue to scan service check-in QR codes.",
-          "microphonePermission": "SmartQueue does not use the microphone.",
-          "recordAudioAndroid": false
-        }
-      ],
-      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SmartQueue to scan service QR codes.",
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

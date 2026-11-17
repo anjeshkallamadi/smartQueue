@@ -164,9 +164,7 @@ export default function QueueHistoryScreen() {
             <View style={styles.infoRow}>
               <Text style={styles.label}>Token number</Text>
               <Text style={styles.token}>
-                {entry.tokenNumber === null
-                  ? "Not assigned"
-                  : "A" + String(entry.tokenNumber).padStart(3, "0")}
+                A{String(entry.tokenNumber).padStart(3, "0")}
               </Text>
             </View>
 

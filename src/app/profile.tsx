@@ -1,3 +1,4 @@
+
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,14 +11,8 @@ import {
 import { router, useFocusEffect } from "expo-router";
 
 import { supabase } from "../lib/supabase";
-import {
-  formatQueueToken,
-  getMyActiveQueues,
-  type MyActiveQueue,
-} from "../services/supabaseQueueService";
+import { getMyActiveQueues, formatQueueToken, type MyActiveQueue } from "../services/supabaseQueueService";
 import styles from "../../styles/profileStyles";
-
-
 
 export default function Profile() {
   const [displayName, setDisplayName] = useState("SmartQueue User");
@@ -73,10 +68,7 @@ export default function Profile() {
           setEmail(userEmail);
 
           const userQueues = await getMyActiveQueues();
-
-          if (isActive) {
-            setActiveQueues(userQueues);
-          }
+          if (isActive) setActiveQueues(userQueues);
         } catch {
           if (isActive) {
             setQueueError(
@@ -208,9 +200,7 @@ export default function Profile() {
               <View style={styles.queueInfoRow}>
                 <Text style={styles.queueInfoLabel}>Your token</Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.tokenNumber === null
-                    ? "Pending verification"
-                    : formatQueueToken(queue.tokenNumber)}
+                  {formatQueueToken(queue.tokenNumber)}
                 </Text>
               </View>
 
@@ -219,9 +209,7 @@ export default function Profile() {
                   People ahead
                 </Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.peopleAhead === null
-                    ? "Not verified"
-                    : queue.peopleAhead}
+                  {queue.peopleAhead ?? "Not available"}
                 </Text>
               </View>
 
@@ -230,18 +218,14 @@ export default function Profile() {
                   Estimated wait
                 </Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.estimatedWaitMinutes === null
-                    ? "Not available"
-                    : queue.estimatedWaitMinutes + " min"}
+                  {queue.estimatedWaitMinutes == null ? "Not available" : `${queue.estimatedWaitMinutes} min`}
                 </Text>
               </View>
 
               <View style={styles.queueInfoRow}>
                 <Text style={styles.queueInfoLabel}>Status</Text>
                 <Text style={styles.queueInfoValue}>
-                  {queue.status === "pending_verification"
-                    ? "Pending arrival verification"
-                    : queue.status}
+                  {queue.queueStatus === "paused" ? "Queue paused" : queue.status}
                 </Text>
               </View>
             </View>
@@ -252,8 +236,7 @@ export default function Profile() {
       <Pressable
         style={styles.option}
         accessibilityRole="button"
-        accessibilityLabel="View queue history"
-        onPress={() => router.push("/queue-history" as any)}
+        onPress={() => router.push("/queue-history")}
       >
         <Text style={styles.optionText}>Queue History</Text>
         <Text style={styles.optionArrow}>›</Text>
@@ -262,8 +245,7 @@ export default function Profile() {
       <Pressable
         style={styles.option}
         accessibilityRole="button"
-        accessibilityLabel="Open account settings"
-        onPress={() => router.push("/account-settings" as any)}
+        onPress={() => router.push("/account-settings")}
       >
         <Text style={styles.optionText}>Account Settings</Text>
         <Text style={styles.optionArrow}>›</Text>

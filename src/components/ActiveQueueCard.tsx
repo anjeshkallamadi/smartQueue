@@ -1,6 +1,7 @@
-
 import { Text, View } from "react-native";
+
 import styles from "../../styles/activeQueueCardStyles";
+
 import {
   formatQueueToken,
   type MyActiveQueue,
@@ -22,7 +23,9 @@ export default function ActiveQueueCard({
       <Text style={styles.title}>My Active Queue</Text>
 
       {loading ? (
-        <Text style={styles.text}>Loading your active queue...</Text>
+        <Text style={styles.text}>
+          Loading your active queue...
+        </Text>
       ) : error ? (
         <Text style={styles.text}>{error}</Text>
       ) : !queue ? (
@@ -35,31 +38,34 @@ export default function ActiveQueueCard({
           <Text style={styles.text}>
             Service: {queue.serviceName}
           </Text>
+
           <Text style={styles.text}>
-            Your token: {queue.tokenNumber === null
-              ? "Not assigned yet"
-              : formatQueueToken(queue.tokenNumber)}
+            Your token: {formatQueueToken(queue.tokenNumber)}
           </Text>
+
           <Text style={styles.text}>
-            Status: {queue.status === "pending_verification"
-              ? "Pending arrival verification"
-              : queue.status}
+            Status: {queue.queueStatus === "paused" ? "Queue paused" : queue.status === "called"
+              ? "Your turn — please proceed"
+              : queue.status.charAt(0).toUpperCase() +
+                queue.status.slice(1)}
           </Text>
+
           <Text style={styles.text}>
-            People ahead: {queue.peopleAhead === null
-              ? "Not in the waiting line yet"
+            People ahead:{" "}
+            {queue.peopleAhead == null
+              ? "Not available"
               : queue.peopleAhead}
           </Text>
-          {queue.status === "pending_verification" && (
-            <Text style={styles.text}>
-              Scan the service's on-site QR code from Queue Details to activate your place in line.
-            </Text>
-          )}
+
           <Text style={styles.text}>
             Estimated wait:{" "}
             {queue.estimatedWaitMinutes == null
               ? "Not available"
-              : `${queue.estimatedWaitMinutes} minutes`}
+              : `${queue.estimatedWaitMinutes} ${
+                  queue.estimatedWaitMinutes === 1
+                    ? "minute"
+                    : "minutes"
+                }`}
           </Text>
         </>
       )}

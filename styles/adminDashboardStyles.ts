@@ -32,6 +32,27 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
+  createServiceButton: {
+    backgroundColor: "#0F766E",
+    paddingVertical: 17,
+    paddingHorizontal: 15,
+    borderRadius: 13,
+    alignItems: "center",
+    marginBottom: 22,
+  },
+  serviceQRButton: {
+    borderWidth: 1,
+    borderColor: "#0F766E",
+    paddingVertical: 14,
+    borderRadius: 11,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  qrButtonText: {
+    color: "#0F766E",
+    fontSize: 15,
+    fontWeight: "700",
+  },
   card: {
     backgroundColor: "#FFFFFF",
     padding: 20,

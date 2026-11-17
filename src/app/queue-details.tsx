@@ -1,9 +1,8 @@
 
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,14 +19,12 @@ import {
   getMyQueuePosition,
   getNowServingToken,
   getSupabaseQueue,
-  joinSupabaseQueue,
-  cancelMyQueueEntry,
 } from "../services/supabaseQueueService";
 
 type MyEntry = {
   id: string;
   queue_id: string;
-  token_number: number | null;
+  token_number: number;
   status: string;
   joined_at: string;
 };
@@ -42,7 +39,7 @@ export default function QueueDetails() {
 
   const [entry, setEntry] = useState<MyEntry | null>(null);
   const [queueStatus, setQueueStatus] = useState("");
-  const [queueMode, setQueueMode] = useState<"virtual" | "on_site">("virtual");
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [averageMinutes, setAverageMinutes] =
     useState<number | null>(null);
   const [peopleAhead, setPeopleAhead] =
@@ -51,20 +48,17 @@ export default function QueueDetails() {
     useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
   const [positionError, setPositionError] =
     useState<string | null>(null);
 
-  const joinInProgress = useRef(false);
-
   const loadDetails = useCallback(async () => {
     if (!queueId) {
       setMessage("No queue ID was provided.");
       setEntry(null);
+      setSelectedServiceId(null);
       setPeopleAhead(null);
       setNowServing(null);
       setLoading(false);
@@ -83,13 +77,13 @@ export default function QueueDetails() {
         ]);
 
       setQueueStatus(queue.status);
-      setQueueMode(queue.queue_mode === "on_site" ? "on_site" : "virtual");
+      setSelectedServiceId(queue.service_id);
       setAverageMinutes(queue.average_service_time);
       setNowServing(currentServing);
       setEntry(myEntry);
       setPeopleAhead(null);
 
-      if (myEntry && myEntry.status !== "pending_verification") {
+      if (myEntry) {
         try {
           const position = await getMyQueuePosition(queueId);
 
@@ -169,103 +163,10 @@ export default function QueueDetails() {
   );
 
   const handleRefresh = async () => {
-    if (refreshing || joining) return;
+    if (refreshing) return;
 
     setRefreshing(true);
     await loadDetails();
-  };
-
-  const handleJoin = async () => {
-    if (
-      !queueId ||
-      joinInProgress.current ||
-      joining ||
-      entry
-    ) {
-      return;
-    }
-
-    joinInProgress.current = true;
-    setJoining(true);
-    setMessage(null);
-    setPositionError(null);
-
-    try {
-      const result = await joinSupabaseQueue(queueId);
-
-      setEntry({
-        id: result.entry_id,
-        queue_id: result.queue_id,
-        token_number: result.token_number,
-        status: result.entry_status,
-        joined_at: new Date().toISOString(),
-      });
-
-      setPeopleAhead(result.people_ahead);
-      setMessage(
-        "Token request created. Scan the current QR code at the service location to activate your place in the queue."
-      );
-
-      // Synchronize after joining.
-      await loadDetails();
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to join the queue."
-      );
-    } finally {
-      joinInProgress.current = false;
-      setJoining(false);
-    }
-  };
-
-  async function cancelCurrentEntry() {
-    if (!queueId || cancelling) return;
-
-    Alert.alert(
-      "Cancel queue token?",
-      "Your pending request or active queue place will be cancelled. You will need to join again to get another token.",
-      [
-        { text: "Keep Token", style: "cancel" },
-        {
-          text: "Cancel Token",
-          style: "destructive",
-          onPress: async () => {
-            setCancelling(true);
-            try {
-              await cancelMyQueueEntry(queueId);
-              setEntry(null);
-              setPeopleAhead(null);
-              setMessage("Your queue entry has been cancelled.");
-              await loadDetails();
-            } catch (error) {
-              setMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Unable to cancel your queue entry."
-              );
-            } finally {
-              setCancelling(false);
-            }
-          },
-        },
-      ]
-    );
-  }
-
-  const handleOpenArrivalScanner = () => {
-    if (!queueId) return;
-
-    router.push({
-      pathname: "/verify-arrival",
-      params: {
-        queueId,
-        serviceName: Array.isArray(serviceName)
-          ? serviceName[0]
-          : serviceName ?? "Service",
-      },
-    } as any);
   };
 
   const estimatedWait =
@@ -275,11 +176,20 @@ export default function QueueDetails() {
       ? peopleAhead * averageMinutes
       : null;
 
-  const buttonDisabled =
+  // The scanner is available to all authenticated accounts, even if they
+  // already hold an active token. The join RPC safely reuses that token.
+  const scanDisabled =
     loading ||
-    joining ||
-    Boolean(entry) ||
+    !selectedServiceId ||
     queueStatus !== "active";
+
+  const openServiceScanner = () => {
+    if (scanDisabled || !queueId || !selectedServiceId) return;
+    router.push({
+      pathname: "/scan-service",
+      params: { serviceId: selectedServiceId, queueId },
+    });
+  };
 
   return (
     <ScrollView
@@ -297,12 +207,8 @@ export default function QueueDetails() {
       </Text>
 
       <Text style={styles.description}>
-        {description ?? "View queue information and join the service queue."}
-      </Text>
-      <Text style={styles.description}>
-        {queueMode === "on_site"
-          ? "Mode: On-site Only. Scan the service QR code at the location to receive a token."
-          : "Mode: Virtual Queue. Request a token remotely, then verify your arrival at the service before entering the waiting line."}
+        {description ??
+          "View queue information and join remotely."}
       </Text>
 
       <Text style={styles.sectionTitle}>
@@ -360,58 +266,28 @@ export default function QueueDetails() {
       <Pressable
         style={[
           styles.joinButton,
-          buttonDisabled &&
+          scanDisabled &&
             styles.joinButtonDisabled,
         ]}
-        onPress={queueMode === "on_site" ? handleOpenArrivalScanner : handleJoin}
-        disabled={buttonDisabled}
+        onPress={openServiceScanner}
+        disabled={scanDisabled}
         accessibilityRole="button"
-        accessibilityLabel="Join selected queue"
+        accessibilityLabel="Scan the selected service QR code to join"
       >
         <Text style={styles.joinButtonText}>
           {loading
             ? "Loading..."
-            : joining
-              ? "Joining..."
-              : entry
-                ? entry.status === "pending_verification"
-                  ? "Verification Required"
-                  : "Already Joined"
-                : queueStatus !== "active"
-                  ? "Queue Unavailable"
-                  : queueMode === "on_site"
-                    ? "Scan QR to Join"
-                    : "Join Queue"}
+            : queueStatus !== "active"
+              ? "Queue Unavailable"
+              : "Scan Service QR"}
         </Text>
       </Pressable>
-
-      {entry?.status === "pending_verification" && (
-        <View style={styles.infoCard}>
-          <Text style={styles.sectionTitle}>Verify your arrival</Text>
-          <Text style={styles.description}>
-            Your token request does not occupy a waiting place yet. Be at the service location, scan its current SmartQueue QR code, or ask staff to verify your arrival.
-          </Text>
-          <Pressable
-            style={styles.joinButton}
-            accessibilityRole="button"
-            onPress={handleOpenArrivalScanner}
-          >
-            <Text style={styles.joinButtonText}>Scan Arrival QR Code</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {entry && ["pending_verification", "waiting", "called"].includes(entry.status) && (
-        <Pressable
-          style={[styles.joinButton, cancelling && styles.joinButtonDisabled]}
-          disabled={cancelling}
-          accessibilityRole="button"
-          onPress={cancelCurrentEntry}
-        >
-          <Text style={styles.joinButtonText}>
-            {cancelling ? "Cancelling..." : "Cancel Queue Token"}
-          </Text>
-        </Pressable>
+      {queueStatus === "active" && (
+        <Text style={styles.message}>
+          {entry
+            ? "You already have a token for this queue. You can still scan its QR code; confirming will keep your existing token."
+            : "Scan the QR code for this service, then confirm to receive your token."}
+        </Text>
       )}
 
       {message && (
@@ -430,16 +306,8 @@ export default function QueueDetails() {
           </Text>
 
           <Text style={styles.token}>
-            {entry.token_number === null
-              ? "Pending"
-              : formatQueueToken(entry.token_number)}
+            {formatQueueToken(entry.token_number)}
           </Text>
-
-          {entry.status === "pending_verification" && (
-            <Text style={styles.message}>
-              Pending arrival verification. This token is not counted in the waiting line until your arrival is confirmed.
-            </Text>
-          )}
 
           <View style={styles.resultRow}>
             <Text style={styles.resultLabel}>
@@ -471,9 +339,7 @@ export default function QueueDetails() {
             </Text>
 
             <Text style={styles.resultValue}>
-              {entry.status === "pending_verification"
-                ? "Pending arrival verification"
-                : entry.status.replace(/_/g, " ")}
+              {entry.status}
             </Text>
           </View>
 
