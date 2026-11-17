@@ -1,13 +1,18 @@
-import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useCallback, useState, useRef } from "react";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useFocusEffect } from "expo-router";
 import { supabase } from "../lib/supabase";
-import styles from "../../styles/accountSettingsStyles";
+import { useAccountSettingsStyles } from "../../styles/accountSettingsStyles";
+import { useAppTheme } from "../context/ThemeContext";
+import { getAvatarUrl, uploadAvatar, errorMessage } from "../services/avatarService";
 
-const AVATAR_BUCKET = "avatars";
+
 
 export default function AccountSettings() {
+  const styles = useAccountSettingsStyles();
+  const { dark, colors, setDark } = useAppTheme();
+  const photoBusy = useRef(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -34,8 +39,8 @@ export default function AccountSettings() {
       const savedName = metadata.full_name ?? metadata.name ?? metadata.display_name;
       setName(typeof savedName === "string" ? savedName : (user.email?.split("@")[0] ?? ""));
       setEmail(user.email ?? "");
-      setAvatarUrl(typeof metadata.avatar_url === "string" ? metadata.avatar_url : null);
-      setLoading(false);
+      try { const url = await getAvatarUrl(user); if (active) setAvatarUrl(url); } catch { if (active) setAvatarUrl(null); }
+      if (active) setLoading(false);
     }
     void loadSettings();
     return () => { active = false; };
@@ -86,44 +91,21 @@ export default function AccountSettings() {
   };
 
   const choosePhoto = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Photo access needed", "Allow SmartQueue to access your photos to choose a profile picture.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
+    if (photoBusy.current) return;
+    photoBusy.current = true;
     setUploadingPhoto(true);
     try {
-      const asset = result.assets[0];
-      const response = await fetch(asset.uri);
-      const file = await response.blob();
-      const extension = (asset.fileName?.split(".").pop() || asset.mimeType?.split("/")[1] || "jpg").toLowerCase();
-      const safeExtension = /^[a-z0-9]+$/.test(extension) ? extension : "jpg";
-      const path = `${(await supabase.auth.getUser()).data.user?.id}/profile-${Date.now()}.${safeExtension}`;
-      const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, {
-        contentType: asset.mimeType ?? "image/jpeg",
-        upsert: true,
-        cacheControl: "3600",
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true,
       });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-      const publicUrl = data.publicUrl;
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { avatar_url: publicUrl },
-      });
-      if (updateError) throw updateError;
-      setAvatarUrl(publicUrl);
+      if (result.canceled || !result.assets[0]) return;
+      const url = await uploadAvatar(result.assets[0]);
+      setAvatarUrl(url);
       Alert.alert("Photo updated", "Your profile photo has been saved.");
     } catch (error) {
-      Alert.alert("Could not update photo", error instanceof Error ? error.message : "Please try again.");
+      Alert.alert("Could not update photo", errorMessage(error));
     } finally {
+      photoBusy.current = false;
       setUploadingPhoto(false);
     }
   };
@@ -142,7 +124,7 @@ export default function AccountSettings() {
           </View>
         </View>
 
-        {loading ? <ActivityIndicator size="large" color="#3986D7" /> : (
+        {loading ? <ActivityIndicator size="large" color={colors.primary} /> : (
           <>
             <View style={styles.photoCard}>
               <View style={styles.avatar}>
@@ -151,20 +133,26 @@ export default function AccountSettings() {
               <View style={styles.photoCopy}>
                 <Text style={styles.sectionTitle}>Profile photo</Text>
                 <Text style={styles.helper}>Choose a square photo that represents you.</Text>
-                <Pressable style={styles.secondaryButton} disabled={uploadingPhoto} onPress={() => void choosePhoto()}>
-                  {uploadingPhoto ? <ActivityIndicator color="#286DB7" /> : <Text style={styles.secondaryButtonText}>Change photo</Text>}
+                <Pressable style={styles.secondaryButton} disabled={uploadingPhoto || savingName || savingPassword} onPress={() => void choosePhoto()}>
+                  {uploadingPhoto ? <ActivityIndicator color={colors.primaryDark} /> : <Text style={styles.secondaryButtonText}>Change photo</Text>}
                 </Pressable>
               </View>
             </View>
 
             <View style={styles.card}>
+              <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                <View style={{flex:1}}><Text style={styles.sectionTitle}>Dark mode</Text><Text style={styles.helper}>Saved on this device</Text></View>
+                <Switch accessibilityLabel="Dark mode" value={dark} onValueChange={setDark} trackColor={{false:colors.border,true:colors.teal}} />
+              </View>
+            </View>
+            <View style={styles.card}>
               <Text style={styles.sectionTitle}>Personal information</Text>
               <Text style={styles.label}>Full name</Text>
-              <TextInput value={name} onChangeText={setName} placeholder="Enter your name" placeholderTextColor="#91A0B2" autoCapitalize="words" style={styles.input} editable={!savingName} />
+              <TextInput value={name} onChangeText={setName} placeholder="Enter your name" placeholderTextColor={colors.secondaryText} autoCapitalize="words" style={styles.input} editable={!savingName} />
               <Text style={styles.label}>Email address</Text>
               <TextInput value={email} editable={false} style={[styles.input, styles.readOnlyInput]} />
               <Text style={styles.helper}>Email changes are not available here.</Text>
-              <Pressable style={styles.primaryButton} disabled={savingName} onPress={() => void saveName()}>
+              <Pressable style={styles.primaryButton} disabled={savingName || uploadingPhoto || savingPassword} onPress={() => void saveName()}>
                 {savingName ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Save name</Text>}
               </Pressable>
             </View>
@@ -172,11 +160,11 @@ export default function AccountSettings() {
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Change password</Text>
               <Text style={styles.label}>New password</Text>
-              <TextInput value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor="#91A0B2" secureTextEntry autoCapitalize="none" style={styles.input} />
+              <TextInput value={password} onChangeText={setPassword} placeholder="At least 8 characters" placeholderTextColor={colors.secondaryText} secureTextEntry autoCapitalize="none" style={styles.input} />
               <Text style={styles.label}>Confirm new password</Text>
-              <TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Enter the password again" placeholderTextColor="#91A0B2" secureTextEntry autoCapitalize="none" style={styles.input} />
+              <TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Enter the password again" placeholderTextColor={colors.secondaryText} secureTextEntry autoCapitalize="none" style={styles.input} />
               <Text style={styles.helper}>Use at least 8 characters and keep your password private.</Text>
-              <Pressable style={styles.primaryButton} disabled={savingPassword} onPress={() => void savePassword()}>
+              <Pressable style={styles.primaryButton} disabled={savingPassword || uploadingPhoto || savingName} onPress={() => void savePassword()}>
                 {savingPassword ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Update password</Text>}
               </Pressable>
             </View>

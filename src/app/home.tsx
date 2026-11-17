@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState, useRef } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,7 +12,10 @@ import {
   View,
 } from "react-native";
 
-import styles from "../../styles/homeStyles";
+import { useHomeStyles } from "../../styles/homeStyles";
+import { useAppTheme } from "../context/ThemeContext";
+import { supabase } from "../lib/supabase";
+import { getAvatarUrl } from "../services/avatarService";
 import ActiveQueueCard from "../components/ActiveQueueCard";
 import ServiceCard from "../components/ServiceCard";
 import NotificationBell from "../components/NotificationBell";
@@ -26,6 +30,11 @@ import {
 } from "../services/supabaseQueueService";
 
 export default function Home() {
+  const styles = useHomeStyles();
+  const { colors, dark, setDark } = useAppTheme();
+  const [firstName, setFirstName] = useState("");
+  const [avatar, setAvatar] = useState<string | null>(null);
+  useFocusEffect(useCallback(()=>{let active=true;setAvatar(null);setFirstName("");void (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user||!active)return;const name=user.user_metadata?.full_name??user.user_metadata?.name;setFirstName(typeof name==="string"?name.trim().split(/\\s+/)[0]:"");const url=await getAvatarUrl(user);if(active)setAvatar(url);}catch{/* initials fallback */}})();return()=>{active=false;};},[]));
   const [services, setServices] = useState<AvailableServiceQueue[]>([]);
   const [activeQueues, setActiveQueues] = useState<MyActiveQueue[]>([]);
   const [search, setSearch] = useState("");
@@ -137,8 +146,9 @@ export default function Home() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.logoText}>SmartQueue</Text>
+        <View style={{flex:1}}><Text style={styles.logoText}>SmartQueue</Text><Text style={{color:colors.secondaryText,fontSize:12}}>Less waiting. More living.</Text></View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Pressable style={styles.iconButton} onPress={()=>setDark(!dark)} accessibilityRole="button" accessibilityLabel={dark?"Switch to light mode":"Switch to dark mode"}><Ionicons name={dark?"sunny-outline":"moon-outline"} size={21} color={colors.primaryDark}/></Pressable>
           <NotificationBell />
           <Pressable
             style={styles.profileButton}
@@ -146,16 +156,12 @@ export default function Home() {
             accessibilityLabel="Open your account"
             onPress={() => router.push("/profile")}
           >
-            <Ionicons name="person" size={22} color="#FFFFFF" />
+            {avatar?<Image source={{uri:avatar}} style={{width:42,height:42,borderRadius:21}} onError={()=>setAvatar(null)}/>:<Ionicons name="person" size={22} color="#FFFFFF" />}
           </Pressable>
         </View>
       </View>
 
-      <Text style={styles.greeting}>Welcome to SmartQueue 👋</Text>
-
-      <Text style={styles.title}>
-        Find a service and skip the waiting line.
-      </Text>
+      <View style={styles.hero}><Text style={styles.greeting}>YOUR DAY, SIMPLIFIED</Text><Text style={styles.title}>{firstName ? "Hello, "+firstName : "Welcome back"}!</Text><Text style={styles.heroText}>Join a virtual queue, track your turn and make time for what matters.</Text><View style={styles.heroStats}><View style={{flex:1}}><Text style={styles.statNumber}>{activeQueueLoading||activeQueueError?"—":activeQueues.length}</Text><Text style={styles.statLabel}>Active queues</Text></View><View style={{flex:1}}><Text style={styles.statNumber}>{loading||error?"—":services.length}</Text><Text style={styles.statLabel}>Available services</Text></View></View></View>
 
       {isAdmin && (
         <Pressable
@@ -176,15 +182,16 @@ export default function Home() {
         </Pressable>
       )}
 
-      <TextInput
+      <View style={styles.searchBox}><Ionicons name="search" size={21} color={colors.secondaryText}/><TextInput
         style={styles.searchInput}
+        placeholderTextColor={colors.secondaryText}
         placeholder="Search services..."
         value={search}
         onChangeText={setSearch}
         autoCapitalize="none"
         clearButtonMode="while-editing"
         accessibilityLabel="Search available services"
-      />
+      /></View>
 
       <Text style={styles.sectionTitle}>My Active Queues</Text>
 
@@ -195,7 +202,7 @@ export default function Home() {
             style={{
               textAlign: "center",
               marginTop: 8,
-              color: "#666666",
+              color: colors.secondaryText,
             }}
           >
             Loading your active queues...
@@ -213,7 +220,7 @@ export default function Home() {
             }}
             style={{ paddingVertical: 10 }}
           >
-            <Text style={{ color: "#2563EB", fontWeight: "600" }}>
+            <Text style={{ color: colors.primaryDark, fontWeight: "600" }}>
               Try again
             </Text>
           </Pressable>
