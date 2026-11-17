@@ -1,37 +1,9 @@
 import { StyleSheet } from "react-native";
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-
-  subtitle: {
-    fontSize: 18,
-    textAlign: "center",
-    marginBottom: 30,
-  },
-
-  button: {
-    width: "100%",
-    height: 52,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  buttonText: {
-    fontSize: 17,
-    fontWeight: "600",
-  },
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "./theme";
+export default StyleSheet.create({
+  container: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: SPACING.lg, backgroundColor: COLORS.background },
+  title: { fontSize: 34, fontWeight: "800", letterSpacing: -0.8, color: COLORS.text, marginTop: SPACING.md, marginBottom: SPACING.sm },
+  subtitle: { fontSize: TYPOGRAPHY.body, lineHeight: 25, color: COLORS.secondaryText, textAlign: "center", marginBottom: SPACING.xl, maxWidth: 300 },
+  button: { width: "100%", height: 54, borderRadius: RADIUS.lg, backgroundColor: COLORS.primary, alignItems: "center", justifyContent: "center" },
+  buttonText: { fontSize: TYPOGRAPHY.body, fontWeight: "700", color: COLORS.surface },
 });
-
-export default styles;
