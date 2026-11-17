@@ -1,37 +1,18 @@
 export const COLORS = {
-  primary: "#2563EB",
-  primaryDark: "#1D4ED8",
-  background: "#F8FAFC",
+  primary: "#3986D7",
+  primaryDark: "#286DB7",
+  teal: "#2FA99D",
+  background: "#F6FAFE",
   surface: "#FFFFFF",
-  text: "#0F172A",
-  secondaryText: "#64748B",
-  border: "#E2E8F0",
-  success: "#16A34A",
-  warning: "#F59E0B",
-  danger: "#DC2626",
+  text: "#24364B",
+  secondaryText: "#718399",
+  border: "#E1EBF4",
+  success: "#269A79",
+  warning: "#D99024",
+  danger: "#D95757",
+  softBlue: "#EAF4FF",
+  softTeal: "#EAF8F5",
 };
-
-export const SPACING = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 40,
-};
-
-export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-};
-
-export const TYPOGRAPHY = {
-  title: 30,
-  heading: 22,
-  subheading: 18,
-  body: 16,
-  small: 14,
-  tiny: 12,
-};
+export const SPACING = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 40 };
+export const RADIUS = { sm: 8, md: 12, lg: 18, xl: 24 };
+export const TYPOGRAPHY = { title: 30, heading: 22, subheading: 18, body: 16, small: 14, tiny: 12 };
