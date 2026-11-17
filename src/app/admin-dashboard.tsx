@@ -237,6 +237,17 @@ export default function AdminDashboard() {
       </Text>
 
       {!loading && isAdmin && (
+        <Pressable
+          style={styles.createServiceButton}
+          accessibilityRole="button"
+          onPress={() => router.navigate("/home")}
+        >
+          <Text style={styles.buttonText}>
+            Join a Queue as Customer
+          </Text>
+        </Pressable>
+      )}
+      {!loading && isAdmin && (
         <Pressable style={styles.createServiceButton}
           accessibilityRole="button"
           onPress={() => router.push("/create-service")}>
@@ -376,6 +387,27 @@ export default function AdminDashboard() {
                 </Pressable>
               ) : null}
 
+              <Pressable
+                accessibilityRole="button"
+                style={[
+                  styles.serviceQRButton,
+                  (!isActive || isBusy) && styles.disabled,
+                ]}
+                disabled={!isActive || isBusy}
+                onPress={() =>
+                  router.push({
+                    pathname: "/queue-details",
+                    params: {
+                      queueId: queue.queue_id,
+                      serviceName: queue.service_name,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.qrButtonText}>
+                  Join This Queue as Customer
+                </Text>
+              </Pressable>
               <Text style={styles.helperText}>
                 Skip does not call the next token.
                 Pausing preserves all existing tokens.
