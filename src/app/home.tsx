@@ -34,7 +34,7 @@ export default function Home() {
   const { colors, dark, setDark } = useAppTheme();
   const [firstName, setFirstName] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
-  useFocusEffect(useCallback(()=>{let active=true;setAvatar(null);setFirstName("");void (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user||!active)return;const name=user.user_metadata?.full_name??user.user_metadata?.name;setFirstName(typeof name==="string"?name.trim().split(/\\s+/)[0]:"");const url=await getAvatarUrl(user);if(active)setAvatar(url);}catch{/* initials fallback */}})();return()=>{active=false;};},[]));
+  useFocusEffect(useCallback(()=>{let active=true;setAvatar(null);setFirstName("");void (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user||!active)return;const name=user.user_metadata?.full_name??user.user_metadata?.name;setFirstName(typeof name==="string"?name.trim().split(/\s+/)[0]:"");const url=await getAvatarUrl(user);if(active)setAvatar(url);}catch{/* initials fallback */}})();return()=>{active=false;};},[]));
   const [services, setServices] = useState<AvailableServiceQueue[]>([]);
   const [activeQueues, setActiveQueues] = useState<MyActiveQueue[]>([]);
   const [search, setSearch] = useState("");
@@ -147,7 +147,7 @@ export default function Home() {
     >
       <View style={styles.header}>
         <View style={{flex:1}}><Text style={styles.logoText}>SmartQueue</Text><Text style={{color:colors.secondaryText,fontSize:12}}>Less waiting. More living.</Text></View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Pressable style={styles.iconButton} onPress={()=>setDark(!dark)} accessibilityRole="button" accessibilityLabel={dark?"Switch to light mode":"Switch to dark mode"}><Ionicons name={dark?"sunny-outline":"moon-outline"} size={21} color={colors.primaryDark}/></Pressable>
           <NotificationBell />
           <Pressable

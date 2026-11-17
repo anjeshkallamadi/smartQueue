@@ -128,7 +128,7 @@ export default function AccountSettings() {
           <>
             <View style={styles.photoCard}>
               <View style={styles.avatar}>
-                {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Text style={styles.avatarInitial}>{name.trim().charAt(0).toUpperCase() || "S"}</Text>}
+                {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} onError={()=>setAvatarUrl(null)} /> : <Text style={styles.avatarInitial}>{name.trim().charAt(0).toUpperCase() || "S"}</Text>}
               </View>
               <View style={styles.photoCopy}>
                 <Text style={styles.sectionTitle}>Profile photo</Text>
